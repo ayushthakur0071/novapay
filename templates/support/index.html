@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - Support Center{% endblock %}
+
+{% block content %}
+<div style="display:grid; grid-template-columns:300px 1fr; gap:32px; height:calc(100vh - 120px); align-items:stretch;">
+    <!-- Left Panel: Ticket List -->
+    <div class="card" style="display:flex; flex-direction:column; gap:20px; padding:20px; overflow-y:auto;">
+        <div style="display:flex; justify-content:between; align-items:center;">
+            <h3 style="font-size:16px; font-weight:700;">My Tickets</h3>
+            <button class="btn btn-primary" style="padding:6px 12px; font-size:12px;" onclick="showCreateTicketModal()">New</button>
+        </div>
+        
+        <div id="ticket-list-box" style="display:flex; flex-direction:column; gap:12px;">
+            {% for t in tickets %}
+            <div class="ticket-item-row" data-id="{{ t.id }}" style="padding:12px; border-radius:var(--radius-md); border:1px solid var(--border); cursor:pointer; background-color:{% if t.status == 'open' %}var(--card-hover){% else %}var(--card){% endif %};" onclick="loadTicketDetail('{{ t.id }}')">
+                <div style="display:flex; justify-content:between; font-size:11px; margin-bottom:6px;">
+                    <span style="font-family:'JetBrains Mono', monospace; font-weight:700;">{{ t.ticket_ref }}</span>
+                    <span style="background:{% if t.priority == 'urgent' %}var(--danger-light){% else %}var(--surface){% endif %}; color:{% if t.priority == 'urgent' %}var(--danger){% else %}var(--text-secondary){% endif %}; font-weight:700; padding:2px 6px; border-radius:10px; text-transform:uppercase;">{{ t.priority }}</span>
+                </div>
+                <h4 style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ t.subject }}</h4>
+                <span style="font-size:10px; color:var(--text-muted); display:block; margin-top:6px;">Status: {{ t.status.upper() }}</span>
+            </div>
+            {% else %}
+            <p style="font-size:13px; color:var(--text-secondary); text-align:center; padding:20px;">No support tickets created.</p>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Right Panel: Conversation Details Thread -->
+    <div class="card" id="chat-thread-panel" style="display:none; flex-direction:column; justify-content:between; padding:24px;">
+        <div style="border-bottom:1px solid var(--border); padding-bottom:16px; display:flex; justify-content:between; align-items:center;">
+            <div>
+                <h3 id="chat-subject" style="font-size:16px; font-weight:700;">Select a ticket</h3>
+                <span id="chat-ref" style="font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono', monospace;">TKT-...</span>
+            </div>
+            <span id="chat-status" style="background:var(--surface); font-size:12px; font-weight:700; padding:4px 10px; border-radius:12px;">OPEN</span>
+        </div>
+        
+        <!-- Conversation Logs -->
+        <div id="chat-bubbles-box" style="flex-grow:1; overflow-y:auto; padding:20px 0; display:flex; flex-direction:column; gap:16px;">
+            <!-- Rendered dynamically -->
+        </div>
+        
+        <!-- Input Block -->
+        <form id="chat-input-form" onsubmit="submitReply(event)" style="display:flex; gap:12px; border-top:1px solid var(--border); padding-top:16px;">
+            <input id="chat-msg-input" class="form-control" type="text" placeholder="Type your message to support..." required autocomplete="off">
+            <button type="submit" class="btn btn-primary">Send</button>
+        </form>
+    </div>
+</div>
+
+<style>
+.ticket-item-row:hover {
+    border-color: var(--text-muted);
+}
+.chat-bubble {
+    max-width: 70%;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    line-height: 1.5;
+}
+.chat-bubble.customer {
+    background-color: var(--primary);
+    color: #FFFFFF;
+    align-self: flex-end;
+    border-bottom-right-radius: 2px;
+}
+.chat-bubble.support {
+    background-color: var(--surface);
+    color: var(--text-primary);
+    align-self: flex-start;
+    border-bottom-left-radius: 2px;
+}
+</style>
+{% endblock %}
+
+{% block modals %}
+<!-- Create Ticket Modal -->
+<div id="create-tkt-modal" class="cmd-palette-backdrop" style="display:none; align-items:center;">
+    <div class="cmd-palette" style="padding:24px; max-width:400px; width:100%;">
+        <h3 style="margin-bottom:16px; font-size:18px; font-weight:700;">Create Support Ticket</h3>
+        <form id="create-tkt-form" onsubmit="handleCreateTicket(event)">
+            <div class="form-group">
+                <label class="form-label" for="tkt-subject">Subject</label>
+                <input id="tkt-subject" class="form-control" type="text" placeholder="e.g. Lost debit card" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="tkt-cat">Category</label>
+                <select id="tkt-cat" class="form-control">
+                    <option value="general">General Inquiry</option>
+                    <option value="accounts">Accounts & Balances</option>
+                    <option value="cards">Cards & Security</option>
+                    <option value="fraud">Fraud & Security Alert (Urgent)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="tkt-message">Detailed Description</label>
+                <textarea id="tkt-message" class="form-control" rows="4" placeholder="Explain your inquiry in detail..." required style="resize:none; font-family:inherit;"></textarea>
+            </div>
+            
+            <div style="display:flex; gap:12px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeCreateTicketModal()">Cancel</button>
+                <button type="submit" id="btn-tkt-submit" class="btn btn-primary">Create Ticket</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let activeTicketId = null;
+
+function showCreateTicketModal() {
+    document.getElementById("create-tkt-modal").style.display = "flex";
+}
+function closeCreateTicketModal() {
+    document.getElementById("create-tkt-modal").style.display = "none";
+}
+
+function handleCreateTicket(e) {
+    e.preventDefault();
+    const subject = document.getElementById("tkt-subject").value;
+    const cat = document.getElementById("tkt-cat").value;
+    const msg = document.getElementById("tkt-message").value;
+    const submitBtn = document.getElementById("btn-tkt-submit");
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    submitBtn.disabled = true;
+    
+    fetch("/api/support/tickets", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({ subject, category: cat, message: msg })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Support ticket created!", "accent");
+            setTimeout(() => window.location.reload(), 1200);
+        } else {
+            showToast(res.error.message || "Failed to create ticket.", "error");
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(() => {
+        showToast("Network error.", "error");
+        submitBtn.disabled = false;
+    });
+}
+
+function loadTicketDetail(id) {
+    activeTicketId = id;
+    
+    document.querySelectorAll(".ticket-item-row").forEach(el => el.style.borderColor = "var(--border)");
+    event.currentTarget.style.borderColor = "var(--primary)";
+    
+    fetch(`/api/support/tickets/${id}`)
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                const t = res.data;
+                document.getElementById("chat-subject").textContent = t.subject;
+                document.getElementById("chat-ref").textContent = t.ticket_ref;
+                
+                const statusEl = document.getElementById("chat-status");
+                statusEl.textContent = t.status.toUpperCase();
+                statusEl.style.backgroundColor = t.status === "open" ? "var(--primary-glow)" : "var(--surface)";
+                statusEl.style.color = t.status === "open" ? "var(--primary)" : "var(--text-secondary)";
+                
+                renderThread(t.thread);
+                document.getElementById("chat-thread-panel").style.display = "flex";
+            }
+        });
+}
+
+function renderThread(thread) {
+    const box = document.getElementById("chat-bubbles-box");
+    box.innerHTML = thread.map(msg => {
+        const isCust = msg.sender === "customer";
+        const alignClass = isCust ? "customer" : "support";
+        return `
+            <div class="chat-bubble ${alignClass}">
+                <div style="font-weight:700; font-size:10px; margin-bottom:4px; opacity:0.8;">${msg.name}</div>
+                <div>${msg.message}</div>
+                <span style="font-size:9px; opacity:0.6; display:block; text-align:right; margin-top:6px;">${msg.timestamp.split("T")[1].substring(0,5)}</span>
+            </div>
+        `;
+    }).join("");
+    
+    // Auto scroll to bottom
+    box.scrollTop = box.scrollHeight;
+}
+
+function submitReply(e) {
+    e.preventDefault();
+    if (!activeTicketId) return;
+    
+    const input = document.getElementById("chat-msg-input");
+    const message = input.value.trim();
+    if (!message) return;
+    
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    fetch(`/api/support/tickets/${activeTicketId}/reply`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({ message })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            input.value = "";
+            renderThread(res.data);
+            showToast("Reply sent successfully.", "accent");
+        }
+    });
+}
+</script>
+{% endblock %}

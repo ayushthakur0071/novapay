@@ -1,0 +1,490 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - Digital Banking Control Dashboard{% endblock %}
+
+{% block content %}
+<div class="stagger dashboard-shell">
+    <!-- Greeting Banner -->
+    <div class="card dashboard-greeting">
+        <div>
+            <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;" id="greeting-text">Good day, {{ current_user.full_name }}</h2>
+            <p style="color:var(--text-secondary); font-size:14px;">Here is your financial status overview for today.</p>
+        </div>
+
+        <div class="dashboard-actions">
+            <a href="{{ url_for('transactions.transfer') }}" class="btn btn-primary">Send</a>
+            <button type="button" id="btn-open-deposit" class="btn btn-secondary">Deposit</button>
+            <a href="{{ url_for('standing_orders.index') }}" class="btn btn-secondary">Pay Bills</a>
+        </div>
+    </div>
+
+    <!-- Balance Cards Grid -->
+    <div class="dashboard-account-grid">
+        {% for acc in accounts %}
+        <button type="button"
+                class="card balance-card account-summary-card js-account-card"
+                data-account-id="{{ acc.id }}"
+                aria-haspopup="dialog"
+                aria-label="Open account details for {{ acc.nickname or acc.account_type }} account ending {{ acc.account_number[-4:] }}">
+            <span class="account-card-action" aria-hidden="true">
+                Details
+                <svg viewBox="0 0 24 24">
+                    <path d="M9 18l6-6-6-6" />
+                </svg>
+            </span>
+            <div>
+                <span style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0; opacity:0.8;">{{ acc.nickname or acc.account_type.upper() }} ACCOUNT</span>
+                <h3 class="balance-reveal" data-balance="{{ acc.balance }}" style="font-size:32px; font-weight:800; margin-top:8px; font-family:'JetBrains Mono', monospace;">£0.00</h3>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                <div style="font-family:'JetBrains Mono', monospace; font-size:13px;">
+                    <p style="opacity:0.7; font-size:10px; text-transform:uppercase;">Account Number</p>
+                    <p>{{ acc.account_number }}</p>
+                </div>
+                <div style="font-family:'JetBrains Mono', monospace; font-size:13px; text-align:right;">
+                    <p style="opacity:0.7; font-size:10px; text-transform:uppercase;">Sort Code</p>
+                    <p>{{ acc.sort_code }}</p>
+                </div>
+            </div>
+        </button>
+        {% else %}
+        <div class="card" style="text-align:center; padding:40px;">
+            <p style="color:var(--text-secondary);">No accounts found. Create one to begin.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Dashboard Core Widgets -->
+    <div class="dashboard-core-grid">
+        <div class="dashboard-column">
+            <!-- Spending Analytics -->
+            <div class="card" id="spending-analytics-card">
+                <div class="dashboard-card-header">
+                    <div>
+                        <h3>Monthly Spending Analytics</h3>
+                        <p>{{ dashboard_data.currentMonth }}</p>
+                    </div>
+                    <span class="dashboard-metric">£{{ "%.2f"|format(monthly_spending_total) }}</span>
+                </div>
+
+                <div id="spending-chart-panel" class="dashboard-chart-wrap" {% if not monthly_spending_rows %}style="display:none;"{% endif %}>
+                    <canvas id="spending-doughnut-canvas" aria-label="Monthly spending by category"></canvas>
+                </div>
+
+                <div id="spending-empty-state" class="dashboard-empty" {% if monthly_spending_rows %}style="display:none;"{% endif %}>
+                    <p>No completed spending records for this month.</p>
+                    <a href="{{ url_for('transactions.transfer') }}" class="btn btn-secondary btn-small">Send Money</a>
+                </div>
+
+                <div id="spending-record-list" class="dashboard-data-list" {% if not monthly_spending_rows %}style="display:none;"{% endif %}>
+                    {% for row in monthly_spending_rows %}
+                    <div class="dashboard-data-row" data-spending-category="{{ row.category }}">
+                        <div class="dashboard-data-label">
+                            <span class="category-dot"></span>
+                            <div>
+                                <strong>{{ row.label }}</strong>
+                                <p class="tracker-subtext">{{ row.record_count }} record{% if row.record_count != 1 %}s{% endif %}</p>
+                            </div>
+                        </div>
+                        <strong class="dashboard-metric">£{{ "%.2f"|format(row.total) }}</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Budgets Tracker -->
+            <div class="card">
+                <div class="dashboard-card-header">
+                    <div>
+                        <h3>Category Budgets</h3>
+                        <p>{{ dashboard_data.currentMonth }}</p>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-small js-open-budget-modal">Add Budget</button>
+                </div>
+
+                <div class="tracker-list" id="budget-list">
+                    {% for budget in budgets %}
+                    <div class="tracker-item budget-item"
+                         data-budget-id="{{ budget.id }}"
+                         data-budget-category="{{ budget.category }}"
+                         data-budget-limit="{{ "%.2f"|format(budget.limit_amount) }}">
+                        <div class="tracker-header">
+                            <div>
+                                <div class="tracker-title">
+                                    <span class="category-dot"></span>
+                                    <strong>{{ budget.category_label }}</strong>
+                                </div>
+                                <p class="tracker-subtext">Spent £{{ "%.2f"|format(budget.spent_amount) }} of £{{ "%.2f"|format(budget.limit_amount) }}</p>
+                            </div>
+                            <strong>{{ "%.1f"|format(budget.percent) }}%</strong>
+                        </div>
+                        <div class="progress-track" aria-label="{{ budget.category_label }} budget progress">
+                            <div class="tracker-fill budget {{ budget.status }}" style="width: {{ budget.progress_width }}%;"></div>
+                        </div>
+                        <div class="tracker-meta-row">
+                            {% if budget.status == "over" %}
+                            <span class="tracker-status over">£{{ "%.2f"|format(budget.over_amount) }} over</span>
+                            {% else %}
+                            <span class="tracker-status {{ budget.status }}">£{{ "%.2f"|format(budget.remaining_amount) }} left</span>
+                            {% endif %}
+                            <div class="tracker-actions">
+                                <button type="button" class="btn btn-secondary btn-small js-edit-budget">Edit</button>
+                                <button type="button" class="btn btn-secondary btn-small js-delete-budget">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="dashboard-empty" id="budget-empty-state">
+                        <p>No active budgets configured for this month.</p>
+                        <button type="button" class="btn btn-secondary btn-small js-open-budget-modal">Add Budget</button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-column">
+            <!-- Recent Transactions -->
+            <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                    <h3 style="font-size:16px; font-weight:700; margin-bottom:20px;">Recent Activity</h3>
+                    <div style="display:flex; flex-direction:column; gap:16px;">
+                        {% for txn in recent_transactions %}
+                        <div class="txn-row" style="display:flex; justify-content:space-between; align-items:center; gap:16px; padding-bottom:12px; border-bottom:1px solid var(--border);">
+                            <div>
+                                <h4 style="font-size:14px; font-weight:600;">{{ txn.description }}</h4>
+                                <span style="font-size:11px; color:var(--text-muted);">{{ txn.created_at.split('T')[0] }} · {{ txn.category_label.upper() }}</span>
+                            </div>
+                            <span style="font-weight:700; font-family:'JetBrains Mono', monospace; color:{% if txn.direction == 'credit' %}var(--accent-dark){% elif txn.direction == 'debit' %}var(--danger){% else %}var(--primary){% endif %};">
+                                {{ txn.display_prefix }}£{{ "%.2f"|format(txn.display_amount) }}
+                            </span>
+                        </div>
+                        {% else %}
+                        <p style="font-size:13px; color:var(--text-secondary); text-align:center; padding:20px;">No recent transactions.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                <a href="{{ url_for('transactions.history') }}" style="color:var(--primary); font-size:13px; font-weight:600; text-decoration:none; margin-top:20px;">View Full History -></a>
+            </div>
+
+            <!-- Savings Goals -->
+            <div class="card">
+                <div class="dashboard-card-header">
+                    <div>
+                        <h3>Savings Goals</h3>
+                        <p>{{ savings_goals|length }} active target{% if savings_goals|length != 1 %}s{% endif %}</p>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-small js-open-goal-modal" {% if not accounts %}disabled{% endif %}>Add Goal</button>
+                </div>
+
+                <div class="tracker-list" id="goal-list">
+                    {% for goal in savings_goals %}
+                    <div class="tracker-item goal-item"
+                         data-goal-id="{{ goal.id }}"
+                         data-goal-account-id="{{ goal.account_id }}"
+                         data-goal-name="{{ goal.name|e }}"
+                         data-goal-target="{{ "%.2f"|format(goal.target_amount) }}"
+                         data-goal-current="{{ "%.2f"|format(goal.current_amount) }}"
+                         data-goal-date="{{ goal.target_date or '' }}">
+                        <div class="tracker-header">
+                            <div>
+                                <div class="tracker-title">
+                                    <span class="goal-initial">{{ goal.name[:1].upper() }}</span>
+                                    <strong>{{ goal.name }}</strong>
+                                </div>
+                                <p class="tracker-subtext">{{ goal.account_nickname or "Account" }} {{ goal.account_number }}</p>
+                            </div>
+                            <strong>{{ "%.1f"|format(goal.percent) }}%</strong>
+                        </div>
+                        <div class="progress-track" aria-label="{{ goal.name }} savings progress">
+                            <div class="tracker-fill {% if goal.is_completed %}over{% endif %}" style="width: {{ goal.progress_width }}%;"></div>
+                        </div>
+                        <div class="tracker-meta-row">
+                            <span>£{{ "%.2f"|format(goal.current_amount) }} / £{{ "%.2f"|format(goal.target_amount) }}</span>
+                            <div class="tracker-actions">
+                                <button type="button" class="btn btn-secondary btn-small js-open-goal-progress">Add Progress</button>
+                                <button type="button" class="btn btn-secondary btn-small js-edit-goal">Edit</button>
+                                <button type="button" class="btn btn-secondary btn-small js-delete-goal">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="dashboard-empty" id="goal-empty-state">
+                        <p>Set up goals to track your savings targets.</p>
+                        <button type="button" class="btn btn-secondary btn-small js-open-goal-modal" {% if not accounts %}disabled{% endif %}>Add Goal</button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Security & Resilience Center -->
+            {% set initial_safety_score = 98 if current_user.mfa_enabled and unread_notifs == 0 else (88 if current_user.mfa_enabled else 76) %}
+            <div class="card safety-center-card"
+                 id="account-safety-card"
+                 data-mfa-enabled="{{ 'true' if current_user.mfa_enabled else 'false' }}"
+                 data-unread-alerts="{{ unread_notifs }}"
+                 data-cloud="{{ active_cloud }}">
+                <div class="dashboard-card-header">
+                    <div>
+                        <h3>Security & Resilience Center</h3>
+                        <p id="safety-check-status">Ready for a live account safety check.</p>
+                    </div>
+                    <span class="safety-score" id="safety-score">{{ initial_safety_score }}</span>
+                </div>
+
+                <div class="safety-progress-track" aria-hidden="true">
+                    <div class="safety-progress-fill" id="safety-progress-fill" style="width: {{ initial_safety_score }}%;"></div>
+                </div>
+
+                <div class="safety-check-list">
+                    <button type="button" class="safety-check-item" data-safety-action="mfa" data-href="{{ url_for('profile.index') }}">
+                        <span class="safety-check-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.4 9.7-8 10-4.6-.3-8-5-8-10V6l8-4zm0 2.2L6 7.2V12c0 3.8 2.4 7.3 6 7.9 3.6-.6 6-4.1 6-7.9V7.2l-6-3z"/><path d="M11 14.6l5-5 1.4 1.4-6.4 6.4-3.4-3.4L9 12.6l2 2z"/></svg>
+                        </span>
+                        <span>
+                            <strong>Two-factor authentication</strong>
+                            <small data-safety-meta="mfa">{% if current_user.mfa_enabled %}Enabled on this profile{% else %}Not enabled yet{% endif %}</small>
+                        </span>
+                        <span class="safety-pill {% if current_user.mfa_enabled %}good{% else %}warn{% endif %}" data-safety-pill="mfa">{% if current_user.mfa_enabled %}OK{% else %}Action{% endif %}</span>
+                    </button>
+
+                    <button type="button" class="safety-check-item" data-safety-action="alerts" data-href="{{ url_for('notifications.index') }}">
+                        <span class="safety-check-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6v-5a7 7 0 0 0-5-6.7V3a2 2 0 1 0-4 0v1.3A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2zm-2 .8H7l.8-.8V11a4.2 4.2 0 1 1 8.4 0v5l.8.8z"/></svg>
+                        </span>
+                        <span>
+                            <strong>Unread security alerts</strong>
+                            <small data-safety-meta="alerts">{{ unread_notifs }} alert{% if unread_notifs != 1 %}s{% endif %} waiting</small>
+                        </span>
+                        <span class="safety-pill {% if unread_notifs == 0 %}good{% else %}warn{% endif %}" data-safety-pill="alerts">{% if unread_notifs == 0 %}Clear{% else %}Review{% endif %}</span>
+                    </button>
+
+                    <button type="button" class="safety-check-item" data-safety-action="cloud">
+                        <span class="safety-check-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 18H8a5 5 0 0 1-.9-9.9A6.5 6.5 0 0 1 19 10a4 4 0 0 1 0 8zM8 16h11a2 2 0 1 0-.6-3.9l-1.4.4-.2-1.5A4.5 4.5 0 0 0 8 9.2L7.8 10l-.9.1A3 3 0 0 0 8 16z"/></svg>
+                        </span>
+                        <span>
+                            <strong>Cloud routing status</strong>
+                            <small data-safety-meta="cloud">Active route: {{ active_cloud }}</small>
+                        </span>
+                        <span class="safety-pill good" data-safety-pill="cloud">Live</span>
+                    </button>
+                </div>
+
+                <div class="safety-actions">
+                    <button type="button" class="btn btn-primary btn-small" id="safety-run-check">Run Check</button>
+                    <a href="{{ url_for('profile.index') }}" class="btn btn-secondary btn-small">Security Profile</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Account Details Flip Modal -->
+<div id="account-detail-modal" class="cmd-palette-backdrop account-detail-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="account-detail-title">
+    <div class="account-flip-stage" id="account-flip-stage">
+        <div class="account-flip-card">
+            <section class="account-flip-face account-flip-front" id="account-flip-front" aria-hidden="false">
+                <button type="button" class="account-modal-close js-close-account-modal" aria-label="Close account details">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                </button>
+
+                <div class="account-modal-mini-card">
+                    <span id="account-preview-name">Account</span>
+                    <strong id="account-preview-balance">£0.00</strong>
+                    <div class="account-preview-meta">
+                        <span>
+                            <small>Account Number</small>
+                            <b id="account-preview-number">--------</b>
+                        </span>
+                        <span>
+                            <small>Sort Code</small>
+                            <b id="account-preview-sort">-- -- --</b>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="account-modal-loading">
+                    <span class="account-loading-dot"></span>
+                    <span id="account-loading-text">Preparing account details</span>
+                </div>
+            </section>
+
+            <section class="account-flip-face account-flip-back" id="account-flip-back" aria-hidden="true" inert>
+                <header class="account-detail-topbar">
+                    <div>
+                        <p class="account-modal-eyebrow">Account intelligence</p>
+                        <h3 id="account-detail-title">Account details</h3>
+                        <p id="account-detail-subtitle">Latest account profile and transaction activity.</p>
+                    </div>
+                    <div class="account-detail-controls">
+                        <button type="button" class="btn btn-secondary btn-small" id="account-flip-toggle">Show Card</button>
+                        <button type="button" class="account-modal-close js-close-account-modal" aria-label="Close account details">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="account-detail-modal-body">
+                    <section class="account-detail-balance-panel">
+                        <div>
+                            <span>Current balance</span>
+                            <strong id="account-detail-balance">£0.00</strong>
+                        </div>
+                        <div>
+                            <span>Available</span>
+                            <strong id="account-detail-available">£0.00</strong>
+                        </div>
+                        <span id="account-detail-status" class="account-status-pill">Loading</span>
+                    </section>
+
+                    <section class="account-detail-section account-detail-profile-section">
+                        <div class="account-section-header">
+                            <h4>Full Account Details</h4>
+                            <a id="account-detail-link" href="/accounts" class="btn btn-secondary btn-small">Manage Account</a>
+                        </div>
+                        <div class="account-detail-grid" id="account-detail-grid"></div>
+                    </section>
+
+                    <section class="account-detail-section account-detail-transactions-section">
+                        <div class="account-section-header">
+                            <h4>Top 10 Transactions</h4>
+                            <a href="{{ url_for('transactions.history') }}" class="account-link">Full History</a>
+                        </div>
+                        <div class="account-transaction-list" id="account-transaction-list"></div>
+                    </section>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<!-- Deposit Modal -->
+<div id="deposit-modal" class="cmd-palette-backdrop" style="display:none; align-items:center;">
+    <div class="cmd-palette">
+        <div class="dashboard-modal-body">
+            <h3>Deposit Funds</h3>
+            <form id="deposit-form">
+                <div class="form-group">
+                    <label class="form-label" for="dep-account">Select Target Account</label>
+                    <select id="dep-account" class="form-control" required>
+                        {% for acc in accounts %}
+                        <option value="{{ acc.id }}">{{ acc.nickname }} ({{ acc.account_number }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="dep-amount">Amount (£)</label>
+                    <input id="dep-amount" class="form-control" type="number" step="0.01" min="0.01" placeholder="100.00" required>
+                </div>
+                <div class="dashboard-modal-actions">
+                    <button type="button" class="btn btn-secondary js-close-deposit-modal">Cancel</button>
+                    <button type="submit" id="btn-dep-submit" class="btn btn-accent">Deposit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Budget Modal -->
+<div id="budget-modal" class="cmd-palette-backdrop" style="display:none; align-items:center;">
+    <div class="cmd-palette">
+        <div class="dashboard-modal-body">
+            <h3 id="budget-modal-title">Add Category Budget</h3>
+            <form id="budget-form">
+                <input type="hidden" id="budget-id">
+                <input type="hidden" id="budget-month" value="{{ dashboard_data.currentMonth }}">
+                <div class="form-group">
+                    <label class="form-label" for="budget-category">Category</label>
+                    <select id="budget-category" class="form-control" required>
+                        {% for category in dashboard_data.budgetCategories %}
+                        <option value="{{ category.value }}">{{ category.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="budget-limit">Monthly Limit (£)</label>
+                    <input id="budget-limit" class="form-control" type="number" step="0.01" min="0.01" placeholder="250.00" required>
+                </div>
+                <div class="dashboard-modal-actions">
+                    <button type="button" class="btn btn-secondary js-close-budget-modal">Cancel</button>
+                    <button type="submit" id="btn-budget-submit" class="btn btn-primary">Save Budget</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Goal Modal -->
+<div id="goal-modal" class="cmd-palette-backdrop" style="display:none; align-items:center;">
+    <div class="cmd-palette">
+        <div class="dashboard-modal-body">
+            <h3 id="goal-modal-title">Add Savings Goal</h3>
+            <form id="goal-form">
+                <input type="hidden" id="goal-id">
+                <div class="form-group">
+                    <label class="form-label" for="goal-account">Linked Account</label>
+                    <select id="goal-account" class="form-control" required>
+                        {% for acc in accounts %}
+                        <option value="{{ acc.id }}">{{ acc.nickname }} ({{ acc.account_number }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="goal-name">Goal Name</label>
+                    <input id="goal-name" class="form-control" type="text" maxlength="100" placeholder="Emergency fund" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="goal-target">Target Amount (£)</label>
+                    <input id="goal-target" class="form-control" type="number" step="0.01" min="0.01" placeholder="1000.00" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="goal-current">Saved Amount (£)</label>
+                    <input id="goal-current" class="form-control" type="number" step="0.01" min="0" placeholder="0.00" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="goal-date">Target Date</label>
+                    <input id="goal-date" class="form-control" type="date">
+                </div>
+                <div class="dashboard-modal-actions">
+                    <button type="button" class="btn btn-secondary js-close-goal-modal">Cancel</button>
+                    <button type="submit" id="btn-goal-submit" class="btn btn-primary">Save Goal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Goal Progress Modal -->
+<div id="goal-progress-modal" class="cmd-palette-backdrop" style="display:none; align-items:center;">
+    <div class="cmd-palette">
+        <div class="dashboard-modal-body">
+            <h3>Add Goal Progress</h3>
+            <form id="goal-progress-form">
+                <input type="hidden" id="goal-progress-id">
+                <p id="goal-progress-name" class="tracker-subtext" style="margin-bottom:16px;"></p>
+                <div class="form-group">
+                    <label class="form-label" for="goal-progress-amount">Amount (£)</label>
+                    <input id="goal-progress-amount" class="form-control" type="number" step="0.01" min="0.01" placeholder="50.00" required>
+                </div>
+                <div class="dashboard-modal-actions">
+                    <button type="button" class="btn btn-secondary js-close-goal-progress-modal">Cancel</button>
+                    <button type="submit" id="btn-goal-progress-submit" class="btn btn-primary">Add Progress</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.NovaPayDashboard = {{ dashboard_data|tojson }};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}?v={{ range(1, 100000) | random }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v={{ range(1, 100000) | random }}"></script>
+{% endblock %}

@@ -1,0 +1,457 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - My Profile{% endblock %}
+
+{% block content %}
+<div class="stagger" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:32px;">
+    <!-- Left Column: Personal Information & KYC status -->
+    <div style="display:flex; flex-direction:column; gap:32px;">
+        <!-- Profile Card -->
+        <div class="card">
+            <h3 style="font-size:16px; font-weight:700; margin-bottom:20px;">Personal Information</h3>
+            
+            <form id="profile-edit-form" onsubmit="handleProfileUpdate(event)">
+                <div class="form-group">
+                    <label class="form-label" for="prof-name">Full Name</label>
+                    <input id="prof-name" class="form-control" type="text" value="{{ current_user.full_name }}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="prof-email">Email Address</label>
+                    <input id="prof-email" class="form-control" type="email" value="{{ current_user.email }}" disabled style="background:var(--surface);">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="prof-phone">Phone Number</label>
+                    <input id="prof-phone" class="form-control" type="tel" value="{{ current_user.phone }}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="prof-address">Street Address</label>
+                    <input id="prof-address" class="form-control" type="text" value="{{ current_user.address or '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="prof-city">City</label>
+                    <input id="prof-city" class="form-control" type="text" value="{{ current_user.city or '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="prof-postcode">Postcode</label>
+                    <input id="prof-postcode" class="form-control" type="text" value="{{ current_user.postcode or '' }}" required>
+                </div>
+                
+                <button type="submit" id="btn-profile-submit" class="btn btn-primary" style="margin-top:10px;">Save Profile Changes</button>
+            </form>
+        </div>
+        
+        <!-- KYC Status Card -->
+        <div class="card">
+            <h3 style="font-size:16px; font-weight:700; margin-bottom:16px;">KYC Status</h3>
+            <div style="display:flex; align-items:center; gap:16px;">
+                <div style="width:16px; height:16px; border-radius:50%; background:{% if current_user.is_verified %}var(--accent){% else %}var(--accent-warm){% endif %};"></div>
+                <div>
+                    <h4 style="font-size:14px; font-weight:700; text-transform:uppercase;">{{ current_user.kyc_status }}</h4>
+                    <p style="font-size:12px; color:var(--text-secondary); margin-top:4px;">
+                        {% if current_user.is_verified %}Your identity is verified. Full transaction capabilities unlocked.{% else %}Compliance verification pending manual check.{% endif %}
+                    </p>
+                </div>
+        </div>
+        
+        <!-- Multi-Factor Authentication (2FA) Card -->
+        <div class="card">
+            <h3 style="font-size:16px; font-weight:700; margin-bottom:16px;">Multi-Factor Authentication (2FA)</h3>
+            <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+                <div style="width:16px; height:16px; border-radius:50%; background:{% if current_user.mfa_enabled %}var(--accent){% else %}var(--text-muted){% endif %};"></div>
+                <div>
+                    <h4 style="font-size:14px; font-weight:700; text-transform:uppercase;">{% if current_user.mfa_enabled %}ENABLED{% else %}DISABLED{% endif %}</h4>
+                    <p style="font-size:12px; color:var(--text-secondary); margin-top:4px;">
+                        {% if current_user.mfa_enabled %}Your account is protected by an authenticator application.{% else %}Enable 2FA to protect your account from unauthorized login attempts.{% endif %}
+                    </p>
+                </div>
+            </div>
+            
+            {% if current_user.mfa_enabled %}
+            <button class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger); padding:10px 18px;" onclick="showMfaDisableModal()">Disable Two-Factor Auth</button>
+            {% else %}
+            <button class="btn btn-accent" style="padding:10px 18px;" onclick="startMfaSetup()">Enable Two-Factor Auth</button>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Right Column: Password updates and Login audits -->
+    <div style="display:flex; flex-direction:column; gap:32px;">
+        <!-- Password Card -->
+        <div class="card">
+            <h3 style="font-size:16px; font-weight:700; margin-bottom:20px;">Change Password</h3>
+            
+            <form id="password-change-form" onsubmit="handlePasswordChange(event)">
+                <div class="form-group">
+                    <label class="form-label" for="old-pass">Current Password</label>
+                    <input id="old-pass" class="form-control" type="password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="new-pass">New Password</label>
+                    <input id="new-pass" class="form-control" type="password" required oninput="checkNewPassStrength()">
+                    
+                    <div class="password-strength-container" id="profile-strength-container" style="margin-top:8px;">
+                        <div class="password-strength-bar">
+                            <div class="strength-segment"></div>
+                            <div class="strength-segment"></div>
+                            <div class="strength-segment"></div>
+                            <div class="strength-segment"></div>
+                        </div>
+                        <span class="strength-text" id="profile-strength-text">Password Strength</span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="confirm-pass">Confirm New Password</label>
+                    <input id="confirm-pass" class="form-control" type="password" required>
+                </div>
+                
+                <button type="submit" id="btn-password-submit" class="btn btn-primary" style="margin-top:10px;">Update Password</button>
+            </form>
+        </div>
+        
+        <!-- Login Audit Logs Card -->
+        <div class="card" style="padding:0; overflow:hidden;">
+            <div style="padding:24px 24px 12px;">
+                <h3 style="font-size:16px; font-weight:700; margin-bottom:4px;">Login Security History</h3>
+                <p style="font-size:12px; color:var(--text-secondary);">Last 10 user sessions logged on your account.</p>
+            </div>
+            
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th style="padding:12px 24px;">Action</th>
+                        <th style="padding:12px 24px;">Date</th>
+                        <th style="padding:12px 24px;">IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in audit_logs %}
+                    <tr>
+                        <td style="padding:12px 24px; font-weight:600;">{{ log.action.replace('_', ' ').title() }}</td>
+                        <td style="padding:12px 24px; font-family:'JetBrains Mono', monospace; font-size:12px;">{{ log.created_at.split('.')[0].replace('T', ' ') }}</td>
+                        <td style="padding:12px 24px; font-family:'JetBrains Mono', monospace; font-size:12px;">{{ log.ip_address or 'Unknown' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" style="padding:24px; text-align:center; color:var(--text-secondary);">No history found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+/* password strength meter overrides local settings */
+.password-strength-container.strength-weak .strength-segment:nth-child(1) { background-color: var(--danger); }
+.password-strength-container.strength-fair .strength-segment:nth-child(1),
+.password-strength-container.strength-fair .strength-segment:nth-child(2) { background-color: var(--accent-warm); }
+.password-strength-container.strength-good .strength-segment:nth-child(1),
+.password-strength-container.strength-good .strength-segment:nth-child(2),
+.password-strength-container.strength-good .strength-segment:nth-child(3) { background-color: var(--primary-light); }
+.password-strength-container.strength-strong .strength-segment { background-color: var(--accent); }
+</style>
+
+{% endblock %}
+
+{% block modals %}
+<!-- MFA Setup Modal -->
+<div id="mfa-setup-modal" class="cmd-palette-backdrop" style="display:none; align-items:center;">
+    <div class="cmd-palette" style="padding:24px; max-width:420px; width:100%;">
+        <div style="display:flex; justify-content:between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+            <h3 style="font-size:18px; font-weight:700;">Setup Multi-Factor Auth (2FA)</h3>
+            <button onclick="closeMfaSetupModal()" style="background:none; border:none; cursor:pointer; font-size:24px; color:var(--text-muted);">&times;</button>
+        </div>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px; line-height:1.4;">
+            Scan the QR code with an authenticator app (like Google Authenticator or Authy) to link your account.
+        </p>
+        
+        <div style="display:flex; justify-content:center; margin:20px 0; background:#FFFFFF; padding:12px; border-radius:var(--radius-md); border:1px solid var(--border);">
+            <img id="mfa-qr-image" src="" alt="MFA QR Code" style="width:200px; height:200px;">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Or enter code manually:</label>
+            <code id="mfa-manual-key" style="display:block; background:var(--surface); padding:10px; border-radius:var(--radius-sm); font-family:'JetBrains Mono', monospace; font-size:13px; text-align:center; user-select:all; border:1px dashed var(--border);"></code>
+        </div>
+        
+        <form id="mfa-setup-form" onsubmit="confirmMfaSetup(event)" style="margin-top:20px;">
+            <div class="form-group">
+                <label class="form-label" for="mfa-setup-code">Verification Code</label>
+                <input id="mfa-setup-code" class="form-control" type="text" placeholder="123456" pattern="\d{6}" maxlength="6" required autocomplete="off" style="text-align:center; font-size:18px; letter-spacing:4px; font-family:'JetBrains Mono', monospace;">
+            </div>
+            <div style="display:flex; gap:12px; margin-top:20px; justify-content:end;">
+                <button type="button" class="btn btn-secondary" onclick="closeMfaSetupModal()">Cancel</button>
+                <button type="submit" id="btn-mfa-setup-submit" class="btn btn-accent">Verify & Enable</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MFA Disable Modal -->
+<div id="mfa-disable-modal" class="cmd-palette-backdrop" style="display:none; align-items:center;">
+    <div class="cmd-palette" style="padding:24px; max-width:400px; width:100%;">
+        <div style="display:flex; justify-content:between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+            <h3 style="font-size:18px; font-weight:700; color:var(--danger);">Disable Multi-Factor Auth</h3>
+            <button onclick="closeMfaDisableModal()" style="background:none; border:none; cursor:pointer; font-size:24px; color:var(--text-muted);">&times;</button>
+        </div>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:20px; line-height:1.4;">
+            Warning: Disabling 2FA will reduce your account security. Please verify your identity by entering the 6-digit code from your authenticator app.
+        </p>
+        
+        <form id="mfa-disable-form" onsubmit="confirmMfaDisable(event)">
+            <div class="form-group">
+                <label class="form-label" for="mfa-disable-code">Verification Code</label>
+                <input id="mfa-disable-code" class="form-control" type="text" placeholder="123456" pattern="\d{6}" maxlength="6" required autocomplete="off" style="text-align:center; font-size:18px; letter-spacing:4px; font-family:'JetBrains Mono', monospace;">
+            </div>
+            <div style="display:flex; gap:12px; margin-top:24px; justify-content:end;">
+                <button type="button" class="btn btn-secondary" onclick="closeMfaDisableModal()">Cancel</button>
+                <button type="submit" id="btn-mfa-disable-submit" class="btn btn-danger">Disable 2FA</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function handleProfileUpdate(e) {
+    e.preventDefault();
+    const name = document.getElementById("prof-name").value;
+    const phone = document.getElementById("prof-phone").value;
+    const address = document.getElementById("prof-address").value;
+    const city = document.getElementById("prof-city").value;
+    const postcode = document.getElementById("prof-postcode").value;
+    const submitBtn = document.getElementById("btn-profile-submit");
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    submitBtn.disabled = true;
+    
+    fetch("/api/profile", {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({ full_name: name, phone, address, city, postcode })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Profile updated successfully!", "accent");
+            submitBtn.disabled = false;
+        } else {
+            showToast(res.error.message || "Update failed.", "error");
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(() => {
+        showToast("Connection failed.", "error");
+        submitBtn.disabled = false;
+    });
+}
+
+function checkNewPassStrength() {
+    const pass = document.getElementById("new-pass").value;
+    const container = document.getElementById("profile-strength-container");
+    const label = document.getElementById("profile-strength-text");
+    
+    container.className = "password-strength-container";
+    
+    if (!pass) {
+        label.textContent = "Password Strength";
+        return;
+    }
+    
+    let score = 0;
+    if (pass.length >= 8) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[a-z]/.test(pass)) score++;
+    if (/\d/.test(pass)) score++;
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(pass)) score++;
+    
+    if (score <= 2) {
+        container.classList.add("strength-weak");
+        label.textContent = "Weak Password";
+    } else if (score === 3) {
+        container.classList.add("strength-fair");
+        label.textContent = "Fair Password";
+    } else if (score === 4) {
+        container.classList.add("strength-good");
+        label.textContent = "Good Password";
+    } else {
+        container.classList.add("strength-strong");
+        label.textContent = "Strong Password";
+    }
+}
+
+function handlePasswordChange(e) {
+    e.preventDefault();
+    const oldPass = document.getElementById("old-pass").value;
+    const newPass = document.getElementById("new-pass").value;
+    const confirm = document.getElementById("confirm-pass").value;
+    const submitBtn = document.getElementById("btn-password-submit");
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    if (newPass !== confirm) {
+        showToast("Passwords do not match.", "error");
+        return;
+    }
+    
+    submitBtn.disabled = true;
+    
+    fetch("/api/profile/change-password", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({ old_password: oldPass, new_password: newPass })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Password updated successfully!", "accent");
+            document.getElementById("old-pass").value = "";
+            document.getElementById("new-pass").value = "";
+            document.getElementById("confirm-pass").value = "";
+            document.getElementById("profile-strength-text").textContent = "Password Strength";
+            document.getElementById("profile-strength-container").className = "password-strength-container";
+            submitBtn.disabled = false;
+        } else {
+            showToast(res.error.message || "Failed to change password.", "error");
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(() => {
+        showToast("Network error.", "error");
+        submitBtn.disabled = false;
+    });
+}
+
+// MFA / 2FA Settings Handlers
+function startMfaSetup() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    fetch("/api/auth/mfa-setup", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        }
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            // Generate QR code using Google Chart API
+            const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(res.uri)}&choe=UTF-8`;
+            document.getElementById("mfa-qr-image").src = qrUrl;
+            document.getElementById("mfa-manual-key").textContent = res.secret;
+            document.getElementById("mfa-setup-modal").style.display = "flex";
+            document.getElementById("mfa-setup-code").focus();
+        } else {
+            showToast(res.error.message || "Failed to initialize 2FA setup.", "error");
+        }
+    })
+    .catch(() => {
+        showToast("Connection failed during 2FA setup.", "error");
+    });
+}
+
+function closeMfaSetupModal() {
+    document.getElementById("mfa-setup-modal").style.display = "none";
+    document.getElementById("mfa-setup-code").value = "";
+    document.getElementById("mfa-qr-image").src = "";
+    document.getElementById("mfa-manual-key").textContent = "";
+}
+
+function confirmMfaSetup(e) {
+    e.preventDefault();
+    const code = document.getElementById("mfa-setup-code").value.trim();
+    const submitBtn = document.getElementById("btn-mfa-setup-submit");
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Confirming...";
+    
+    fetch("/api/auth/mfa-confirm", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({ code })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Two-Factor Authentication enabled successfully!", "accent");
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showToast(res.error.message || "Invalid code. Please try again.", "error");
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Verify & Enable";
+            document.getElementById("mfa-setup-code").value = "";
+            document.getElementById("mfa-setup-code").focus();
+        }
+    })
+    .catch(() => {
+        showToast("Network error.", "error");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Verify & Enable";
+    });
+}
+
+function showMfaDisableModal() {
+    document.getElementById("mfa-disable-modal").style.display = "flex";
+    document.getElementById("mfa-disable-code").focus();
+}
+
+function closeMfaDisableModal() {
+    document.getElementById("mfa-disable-modal").style.display = "none";
+    document.getElementById("mfa-disable-code").value = "";
+}
+
+function confirmMfaDisable(e) {
+    e.preventDefault();
+    const code = document.getElementById("mfa-disable-code").value.trim();
+    const submitBtn = document.getElementById("btn-mfa-disable-submit");
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Disabling...";
+    
+    fetch("/api/auth/mfa-disable", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({ code })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Two-Factor Authentication disabled.", "info");
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showToast(res.error.message || "Failed to disable 2FA.", "error");
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Disable 2FA";
+            document.getElementById("mfa-disable-code").value = "";
+            document.getElementById("mfa-disable-code").focus();
+        }
+    })
+    .catch(() => {
+        showToast("Network error.", "error");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Disable 2FA";
+    });
+}
+</script>
+{% endblock %}

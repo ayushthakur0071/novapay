@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - Login to Banking Control{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}?v={{ range(1, 100000) | random }}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-container" style="position:fixed; inset:0; z-index:1000;">
+    <!-- Left Hero Column -->
+    <div class="auth-hero">
+        <div class="floating-circle-1"></div>
+        <div class="floating-circle-2"></div>
+        
+        <div class="auth-hero-content">
+            <div class="auth-logo">
+                <svg viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#00C896" stroke-width="8"/>
+                    <polygon points="40,35 68,50 40,65" fill="#00C896" />
+                </svg>
+                <h1>NovaPay</h1>
+            </div>
+            
+            <h2 class="auth-hero-title">Intelligent Multi-Cloud Digital Banking</h2>
+            <p style="color:#E2E8F0; margin-bottom:40px; font-size:16px;">
+                Experience banking engineered for resilience. Powered by active-passive database replication and automated multi-cloud failover checks.
+            </p>
+            
+            <ul class="auth-features">
+                <li class="auth-feature-item">
+                    <div class="auth-feature-icon">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <div class="auth-feature-text">
+                        <h3>Automated DR Failover</h3>
+                        <p>Under 3-second RTO recovery between AWS and Azure backends.</p>
+                    </div>
+                </li>
+                <li class="auth-feature-item">
+                    <div class="auth-feature-icon">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 15l-4-4 1.41-1.41L10 13.17l7.59-7.59L19 7l-9 9z"/></svg>
+                    </div>
+                    <div class="auth-feature-text">
+                        <h3>Bank-Grade Security</h3>
+                        <p>Bcrypt hashing, rate limit locks, and parameterized ledger transactions.</p>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Right Form Column -->
+    <div class="auth-form-panel">
+        <!-- Login Form Block -->
+        <div id="login-block">
+            <div class="auth-header">
+                <h2>Welcome Back</h2>
+                <p>Don't have an account? <a href="{{ url_for('auth.register') }}">Register Here</a></p>
+            </div>
+            
+            <form id="login-form" method="POST" onsubmit="handleLogin(event)">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div class="form-group">
+                    <label class="form-label" for="login-email">Email Address</label>
+                    <input id="login-email" class="form-control" type="email" placeholder="you@domain.com" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="login-password">Password</label>
+                    <input id="login-password" class="form-control" type="password" placeholder="••••••••" required>
+                </div>
+                
+                <div class="auth-options">
+                    <label class="remember-me">
+                        <input type="checkbox" id="remember-me">
+                        <span>Remember me</span>
+                    </label>
+                    <a href="#" class="forgot-link" onclick="toggleAuthBlocks(event, 'forgot')">Forgot Password?</a>
+                </div>
+                
+                <button type="submit" id="btn-login-submit" class="btn btn-primary" style="width:100%; padding:14px;">Sign In</button>
+            </form>
+        </div>
+        
+        <!-- Forgot Password Block -->
+        <div id="forgot-block" style="display:none;">
+            <div class="auth-header">
+                <h2>Recover Password</h2>
+                <p>Remembered your credentials? <a href="#" onclick="toggleAuthBlocks(event, 'login')">Log In</a></p>
+            </div>
+            
+            <form id="forgot-form" method="POST" onsubmit="handleForgot(event)">
+                <div class="form-group">
+                    <label class="form-label" for="forgot-email">Email Address</label>
+                    <input id="forgot-email" class="form-control" type="email" placeholder="you@domain.com" required>
+                </div>
+                
+                <button type="submit" id="btn-forgot-submit" class="btn btn-primary" style="width:100%; padding:14px; margin-top:10px;">Send Recovery Link</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleAuthBlocks(e, target) {
+    if (e) e.preventDefault();
+    const login = document.getElementById("login-block");
+    const forgot = document.getElementById("forgot-block");
+    
+    if (target === "forgot") {
+        login.style.display = "none";
+        forgot.style.display = "block";
+    } else {
+        login.style.display = "block";
+        forgot.style.display = "none";
+    }
+}
+
+function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById("login-email").value;
+    const password = document.getElementById("login-password").value;
+    const remember = document.getElementById("remember-me").checked;
+    const submitBtn = document.getElementById("btn-login-submit");
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Authenticating...";
+    
+    fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({ email, password, remember })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            if (res.mfa_required) {
+                window.location.href = "/mfa-verify";
+            } else {
+                window.location.href = "{{ url_for('dashboard.index') }}";
+            }
+        } else {
+            showToast(res.error.message || "Authentication failed.", "error");
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Sign In";
+        }
+    })
+    .catch(() => {
+        showToast("Connection failed.", "error");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Sign In";
+    });
+}
+
+function handleForgot(e) {
+    e.preventDefault();
+    const email = document.getElementById("forgot-email").value;
+    showToast("Password reset link sent (simulated).", "info");
+    toggleAuthBlocks(null, "login");
+}
+</script>
+{% endblock %}

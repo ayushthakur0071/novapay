@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay Admin - Manage Users{% endblock %}
+
+{% block body_class %}admin-body{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="admin-page admin-users-page stagger" data-admin-page="users">
+    <section class="admin-page-header">
+        <div>
+            <span class="admin-kicker">Customer Operations</span>
+            <h2>User Accounts Management</h2>
+            <p>Search customers, surface KYC pressure, review account exposure, and take controlled admin actions from one audit view.</p>
+        </div>
+        <div class="admin-header-actions">
+            <button type="button" class="btn btn-secondary admin-icon-button" id="admin-users-refresh">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.7 6.3A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h8V3z"/></svg>
+                Refresh
+            </button>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-primary admin-icon-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h10.2l-4.6 4.6L11 19l7-7-7-7-1.4 1.4 4.6 4.6H4z"/></svg>
+                Command Center
+            </a>
+        </div>
+    </section>
+
+    <section class="admin-user-summary-grid" aria-label="User management summary">
+        <button type="button" class="admin-summary-card active" data-user-preset="all">
+            <span>Directory</span>
+            <strong id="users-total-count">0</strong>
+            <small>All customers</small>
+        </button>
+        <button type="button" class="admin-summary-card" data-user-preset="pending">
+            <span>KYC Queue</span>
+            <strong id="users-pending-count">0</strong>
+            <small>Pending review</small>
+        </button>
+        <button type="button" class="admin-summary-card" data-user-preset="locked">
+            <span>Locked Profiles</span>
+            <strong id="users-locked-count">0</strong>
+            <small>Access restricted</small>
+        </button>
+        <button type="button" class="admin-summary-card" data-user-preset="approved">
+            <span>Verified</span>
+            <strong id="users-approved-count">0</strong>
+            <small>KYC approved</small>
+        </button>
+    </section>
+
+    <section class="admin-filter-panel" aria-label="User filters">
+        <label class="admin-search-field" for="admin-user-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16a6.471 6.471 0 0 0 4.23-1.57l.27.28v.79l5 4.99L20.49 19zM9.5 14A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+            <input id="admin-user-search" type="search" placeholder="Search name, email, phone, or user ID" autocomplete="off">
+        </label>
+
+        <label class="admin-filter-control" for="admin-kyc-filter">
+            <span>KYC</span>
+            <select id="admin-kyc-filter">
+                <option value="all">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="hold">Hold</option>
+                <option value="declined">Declined</option>
+            </select>
+        </label>
+
+        <label class="admin-filter-control" for="admin-status-filter">
+            <span>Status</span>
+            <select id="admin-status-filter">
+                <option value="all">All profiles</option>
+                <option value="active">Active</option>
+                <option value="locked">Locked</option>
+            </select>
+        </label>
+
+        <p class="admin-filter-result" id="admin-user-result-count">Loading customers...</p>
+    </section>
+
+    <section class="admin-table-panel">
+        <header class="admin-panel-header">
+            <div>
+                <span class="admin-kicker">Directory</span>
+                <h3>Customer Audit Table</h3>
+            </div>
+            <span class="admin-live-chip">Live directory</span>
+        </header>
+
+        <div class="admin-table-container">
+            <table class="admin-table" id="admin-users-table">
+                <thead>
+                    <tr>
+                        <th>Customer</th>
+                        <th>Email Address</th>
+                        <th>Phone</th>
+                        <th>KYC Verification</th>
+                        <th>Active Status</th>
+                        <th>Joined</th>
+                        <th class="admin-table-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-users-tbody">
+                    <tr>
+                        <td colspan="7" class="admin-empty-cell">Fetching customer directory...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block modals %}
+<div id="user-detail-modal" class="admin-modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="admin-user-modal-title">
+    <section class="admin-audit-modal">
+        <header class="admin-modal-header">
+            <div class="admin-modal-identity">
+                <span class="admin-modal-avatar" id="user-modal-avatar">--</span>
+                <div>
+                    <span class="admin-kicker">Customer Audit Profile</span>
+                    <h3 id="admin-user-modal-title">Customer profile</h3>
+                    <p id="det-user-id">Loading profile...</p>
+                </div>
+            </div>
+            <button type="button" class="admin-modal-close" id="close-user-detail-modal" aria-label="Close customer audit profile">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </header>
+
+        <div class="admin-audit-modal-body">
+            <section class="admin-audit-summary">
+                <div class="admin-audit-balance">
+                    <span>Total account exposure</span>
+                    <strong id="det-total-balance">£0.00</strong>
+                    <small><span id="det-account-count">0</span> linked products</small>
+                </div>
+                <div class="admin-audit-status-grid">
+                    <span class="admin-status-badge" id="det-kyc">PENDING</span>
+                    <span class="admin-status-badge" id="det-active">Checking status</span>
+                </div>
+            </section>
+
+            <section class="admin-audit-card">
+                <header>
+                    <h4>Identity Details</h4>
+                    <span class="admin-live-chip">Profile</span>
+                </header>
+                <dl class="admin-detail-list">
+                    <div>
+                        <dt>Full Name</dt>
+                        <dd id="det-fullname">-</dd>
+                    </div>
+                    <div>
+                        <dt>Email</dt>
+                        <dd id="det-email">-</dd>
+                    </div>
+                    <div>
+                        <dt>Phone</dt>
+                        <dd id="det-phone">-</dd>
+                    </div>
+                    <div>
+                        <dt>Address</dt>
+                        <dd id="det-address">-</dd>
+                    </div>
+                    <div>
+                        <dt>Joined</dt>
+                        <dd id="det-created">-</dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="admin-audit-card">
+                <header>
+                    <h4>Identity Scan</h4>
+                    <span id="det-doc-type" class="admin-live-chip">No document</span>
+                </header>
+                <div id="det-kyc-doc-section" class="admin-doc-preview">
+                    <div class="admin-doc-empty" id="det-doc-empty">No KYC document uploaded for this customer.</div>
+                    <img id="det-doc-img" src="" alt="Uploaded KYC scan preview">
+                </div>
+            </section>
+
+            <section class="admin-audit-card admin-audit-products">
+                <header>
+                    <h4>Financial Products Bound</h4>
+                    <span class="admin-live-chip" id="det-product-status">0 accounts</span>
+                </header>
+                <div id="det-accounts-box" class="admin-account-stack"></div>
+            </section>
+        </div>
+
+        <footer class="admin-modal-actions">
+            <div class="admin-kyc-controls" id="kyc-controls-group">
+                <button type="button" class="btn btn-accent" data-kyc-status="approved" id="btn-modal-approve">Approve</button>
+                <button type="button" class="btn btn-secondary" data-kyc-status="hold" id="btn-modal-hold">Hold</button>
+                <button type="button" class="btn btn-danger" data-kyc-status="declined" id="btn-modal-decline">Decline</button>
+            </div>
+            <button type="button" class="btn btn-secondary admin-danger-outline" id="btn-modal-freeze">Lock User Profile</button>
+            <button type="button" class="btn btn-secondary" id="btn-modal-close-secondary">Close</button>
+        </footer>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

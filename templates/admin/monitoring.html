@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay Admin - System Monitoring{% endblock %}
+
+{% block body_class %}admin-body{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="admin-page admin-monitoring-page stagger" data-admin-page="monitoring">
+    <section class="admin-hero-panel admin-monitoring-hero">
+        <div class="admin-hero-content">
+            <span class="admin-kicker">Telemetry Console</span>
+            <h2>DR Failover & System Monitoring</h2>
+            <p>Watch AWS and Azure route health, live telemetry logs, failover history, and operational readiness from a single command surface.</p>
+
+            <div class="admin-live-strip" aria-live="polite">
+                <span class="admin-live-dot"></span>
+                <strong id="monitor-active-route">Connecting to routing layer</strong>
+                <span id="monitor-health-summary">Waiting for the next pulse.</span>
+            </div>
+        </div>
+
+        <div class="admin-hero-actions">
+            <button type="button" class="btn btn-secondary admin-icon-button" id="monitoring-refresh-btn">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.7 6.3A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h8V3z"/></svg>
+                Run Health Pulse
+            </button>
+            <button type="button" id="trigger-failover-btn" class="btn btn-primary admin-icon-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 2 20h20zm1 15h-2v-2h2zm0-4h-2V8h2z"/></svg>
+                Manual DR Failover
+            </button>
+        </div>
+    </section>
+
+    <section class="admin-node-grid" aria-label="Cloud node telemetry">
+        <article class="admin-node-card" data-node-card="aws">
+            <header>
+                <div>
+                    <span class="admin-kicker">Primary Candidate</span>
+                    <h3>AWS Cloud Node</h3>
+                </div>
+                <span id="aws-node-status" class="status-dot green"></span>
+            </header>
+            <div class="admin-node-score" style="--node-score: 0%;">
+                <strong id="aws-health-score">0</strong>
+                <span>health</span>
+            </div>
+            <div class="admin-node-metrics">
+                <div>
+                    <span>Latency</span>
+                    <strong id="aws-latency">0ms</strong>
+                </div>
+                <div>
+                    <span>CPU</span>
+                    <strong id="aws-cpu">0.0%</strong>
+                    <i class="admin-meter"><b id="aws-cpu-bar"></b></i>
+                </div>
+                <div>
+                    <span>Memory</span>
+                    <strong id="aws-mem">0.0%</strong>
+                    <i class="admin-meter"><b id="aws-mem-bar"></b></i>
+                </div>
+            </div>
+        </article>
+
+        <article class="admin-node-card" data-node-card="azure">
+            <header>
+                <div>
+                    <span class="admin-kicker">Secondary Candidate</span>
+                    <h3>Azure Cloud Node</h3>
+                </div>
+                <span id="azure-node-status" class="status-dot green"></span>
+            </header>
+            <div class="admin-node-score" style="--node-score: 0%;">
+                <strong id="azure-health-score">0</strong>
+                <span>health</span>
+            </div>
+            <div class="admin-node-metrics">
+                <div>
+                    <span>Latency</span>
+                    <strong id="azure-latency">0ms</strong>
+                </div>
+                <div>
+                    <span>CPU</span>
+                    <strong id="azure-cpu">0.0%</strong>
+                    <i class="admin-meter"><b id="azure-cpu-bar"></b></i>
+                </div>
+                <div>
+                    <span>Memory</span>
+                    <strong id="azure-mem">0.0%</strong>
+                    <i class="admin-meter"><b id="azure-mem-bar"></b></i>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <section class="admin-monitoring-grid">
+        <article class="admin-ops-panel admin-ops-panel-large">
+            <header class="admin-panel-header">
+                <div>
+                    <span class="admin-kicker">Live Stream</span>
+                    <h3>DR Engine Logs</h3>
+                </div>
+                <div class="admin-log-controls">
+                    <select id="log-filter-select" aria-label="Filter logs by server">
+                        <option value="all">All nodes</option>
+                        <option value="aws">AWS only</option>
+                        <option value="azure">Azure only</option>
+                    </select>
+                    <button type="button" class="admin-chip-button" id="log-pause-btn">Pause</button>
+                    <button type="button" class="admin-chip-button" id="log-clear-btn">Clear</button>
+                </div>
+            </header>
+            <div class="log-stream-container" id="admin-log-stream" aria-live="polite">
+                <div class="log-stream-entry">Starting log listeners...</div>
+            </div>
+        </article>
+
+        <article class="admin-ops-panel">
+            <header class="admin-panel-header">
+                <div>
+                    <span class="admin-kicker">Recovery</span>
+                    <h3>Failover History</h3>
+                </div>
+                <span class="admin-live-chip" id="failover-count-chip">0 events</span>
+            </header>
+            <div class="admin-event-stream compact" id="failover-history-list">
+                <div class="admin-skeleton-line"></div>
+                <div class="admin-skeleton-line short"></div>
+            </div>
+        </article>
+
+        <article class="admin-ops-panel">
+            <header class="admin-panel-header">
+                <div>
+                    <span class="admin-kicker">Readiness</span>
+                    <h3>Incident Checklist</h3>
+                </div>
+                <span class="admin-live-chip">Interactive</span>
+            </header>
+            <div class="admin-readiness-list">
+                <button type="button" class="admin-readiness-item active">
+                    <span>Database ping stable</span>
+                    <strong id="readiness-db">Checking</strong>
+                </button>
+                <button type="button" class="admin-readiness-item active">
+                    <span>Proxy route observed</span>
+                    <strong id="readiness-route">Checking</strong>
+                </button>
+                <button type="button" class="admin-readiness-item">
+                    <span>Manual override armed</span>
+                    <strong>Requires confirmation</strong>
+                </button>
+            </div>
+        </article>
+    </section>
+</div>
+{% endblock %}
+
+{% block modals %}
+<div id="failover-modal" class="admin-modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="failover-modal-title">
+    <section class="admin-failover-modal">
+        <header class="admin-modal-header">
+            <div>
+                <span class="admin-kicker">Manual Override</span>
+                <h3 id="failover-modal-title">Trigger DR Failover</h3>
+                <p>Route traffic to the selected cloud node after confirmation.</p>
+            </div>
+            <button type="button" class="admin-modal-close" id="close-failover-modal" aria-label="Close failover dialog">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </header>
+
+        <div class="failover-warn-box">
+            <strong>High impact operation</strong>
+            <p>This manually overrides active-passive routing. Use it only when the target node is healthy and customer sessions can safely be moved.</p>
+        </div>
+
+        <div class="admin-failover-grid">
+            <label class="admin-filter-control" for="failover-target-select">
+                <span>Target Cloud Server</span>
+                <select id="failover-target-select">
+                    <option value="aws">AWS Cloud Node (Port 5001)</option>
+                    <option value="azure">Azure Cloud Node (Port 5002)</option>
+                </select>
+            </label>
+
+            <label class="admin-filter-control" for="failover-confirm-input">
+                <span>Write FAILOVER to confirm</span>
+                <input id="failover-confirm-input" type="text" placeholder="type FAILOVER" autocomplete="off">
+            </label>
+        </div>
+
+        <footer class="admin-modal-actions">
+            <button type="button" id="cancel-failover-btn" class="btn btn-secondary">Cancel</button>
+            <button type="button" id="submit-failover-btn" class="btn btn-danger" disabled>Trigger Failover</button>
+        </footer>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

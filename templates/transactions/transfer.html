@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - Send Money{% endblock %}
+
+{% block content %}
+<div class="stagger" style="max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:24px;">
+    <div>
+        <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">Send Money</h2>
+        <p style="color:var(--text-secondary); font-size:14px;">Transfer funds between your accounts or pay local beneficiaries instantly.</p>
+    </div>
+    
+    <!-- Step progress bar -->
+    <div id="progress-bar-wrapper" style="height:6px; width:100%; background:var(--border); border-radius:3px; overflow:hidden; margin-bottom:12px;">
+        <div class="progress-bar-fill" style="height:100%; background:var(--primary); width:0%;"></div>
+    </div>
+    
+    <!-- Wizard Forms Container -->
+    <div id="wizard-steps-container" class="transfer-wizard-form">
+        <!-- Step 1: Select Recipient -->
+        <div class="card wizard-step active" data-step="1">
+            <h3 style="font-size:16px; font-weight:700; margin-bottom:20px;">1. Choose Recipient</h3>
+            
+            <div class="form-group">
+                <label class="form-label" for="from_account_id">From Account</label>
+                <select id="from_account_id" class="form-control">
+                    <option value="" disabled selected>Select source account</option>
+                    {% for acc in accounts %}
+                    <option value="{{ acc.id }}" data-balance="{{ acc.balance }}" data-overdraft="{{ acc.overdraft_limit }}">
+                        {{ acc.nickname }} (Balance: £{{ acc.balance }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-top:20px;">
+                <label class="form-label">Recipient Type</label>
+                <div style="display:flex; gap:16px; margin-top:8px; flex-wrap:wrap;">
+                    <label class="remember-me">
+                        <input type="radio" name="recipient_type" value="existing" checked>
+                        <span>Saved Payee</span>
+                    </label>
+                    <label class="remember-me">
+                        <input type="radio" name="recipient_type" value="self">
+                        <span>Own Account</span>
+                    </label>
+                    <label class="remember-me">
+                        <input type="radio" name="recipient_type" value="custom">
+                        <span>New Payee</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Own Account Dropdown -->
+            <div id="self-payee-details" class="form-group" style="display:none; margin-top:20px;">
+                <label class="form-label" for="to_account_id">Select Destination Account</label>
+                <select id="to_account_id" class="form-control">
+                    <option value="" disabled selected>Select destination account</option>
+                    {% for acc in accounts %}
+                    <option value="{{ acc.id }}" data-account-number="{{ acc.account_number }}" data-sort-code="{{ acc.sort_code }}" data-balance="{{ acc.balance }}">
+                        {{ acc.nickname }} - {{ acc.account_number }} (Sort Code: {{ acc.sort_code }})
+                    </option>
+                    {% endfor %}
+                </select>
+                
+                <!-- Own Account Detail Info Card -->
+                <div id="self-account-info-card" style="display:none; margin-top:12px; padding:12px; background:var(--surface); border:1px solid var(--border); border-radius:8px; font-size:13px; flex-direction:column; gap:6px;">
+                    <div><span style="color:var(--text-secondary);">Sort Code:</span> <strong id="self-sort-code" style="font-family:'JetBrains Mono', monospace;"></strong></div>
+                    <div><span style="color:var(--text-secondary);">Account Number:</span> <strong id="self-account-number" style="font-family:'JetBrains Mono', monospace;"></strong></div>
+                    <div><span style="color:var(--text-secondary);">Available Balance:</span> <strong id="self-balance" style="color:var(--accent);"></strong></div>
+                </div>
+            </div>
+            
+            <!-- Saved Payee Dropdown -->
+            <div id="existing-payee-details" class="form-group" style="margin-top:20px;">
+                <label class="form-label" for="beneficiary_id">Select Recipient</label>
+                <select id="beneficiary_id" class="form-control">
+                    <option value="" disabled selected>Select beneficiary</option>
+                    {% for ben in beneficiaries %}
+                    <option value="{{ ben.id }}">{{ ben.nickname }} ({{ ben.full_name }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Custom Payee inputs -->
+            <div id="custom-payee-details" style="display:none; margin-top:20px; border-top:1px solid var(--border); padding-top:20px;">
+                <div class="form-group">
+                    <label class="form-label" for="payee_name">Full Name</label>
+                    <input id="payee_name" class="form-control" type="text" placeholder="e.g. Liam Smith">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="sort_code">Sort Code</label>
+                    <input id="sort_code" class="form-control" type="text" placeholder="XX-XX-XX">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="account_number">Account Number</label>
+                    <input id="account_number" class="form-control" type="text" placeholder="8-digit number">
+                </div>
+            </div>
+            
+            <button type="button" id="btn-next-1" class="btn btn-primary" style="width:100%; margin-top:24px; padding:12px;">Continue</button>
+        </div>
+        
+        <!-- Step 2: Amount & Category Details -->
+        <div class="card wizard-step" data-step="2" style="display:none;">
+            <h3 style="font-size:16px; font-weight:700; margin-bottom:20px;">2. Transaction Details</h3>
+            
+            <div class="form-group">
+                <label class="form-label" for="amount">Amount (£)</label>
+                <input id="amount" class="form-control" type="number" step="0.01" min="0.01" max="50000" placeholder="0.00" required style="font-size:24px; font-weight:700; text-align:center; height:60px;">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="reference">Reference / Description</label>
+                <input id="reference" class="form-control" type="text" placeholder="e.g. Rent payment" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="category">Category</label>
+                <select id="category" class="form-control">
+                    <option value="other">Other</option>
+                    <option value="bills">Bills</option>
+                    <option value="shopping">Shopping</option>
+                    <option value="eating_out">Eating Out</option>
+                    <option value="transport">Transport</option>
+                    <option value="entertainment">Entertainment</option>
+                    <option value="health">Health</option>
+                    <option value="travel">Travel</option>
+                    <option value="savings">Savings</option>
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-top:20px;">
+                <label class="form-label" for="transfer_method">Transfer Channel (Category)</label>
+                <select id="transfer_method" class="form-control" style="background:var(--surface); color:var(--text-primary); cursor:pointer;">
+                    <option value="IMPS" selected>IMPS (Instant Transfer - Fee: £1.50)</option>
+                    <option value="NEFT">NEFT (Standard Batch - Fee: £0.50)</option>
+                    <option value="RTGS">RTGS (High-Value Settlement - Fee: £5.00)</option>
+                    <option value="OVERDRAFT">Overdraft Transfer (Fee: £10.00)</option>
+                </select>
+                <span id="transfer-charge-hint" style="font-size:11px; color:var(--text-secondary); margin-top:6px; display:block;">
+                    * An additional fee of <strong style="color:var(--accent);">£1.50</strong> will be deducted from your account.
+                </span>
+            </div>
+            
+            <div style="display:flex; gap:16px; margin-top:28px;">
+                <button type="button" id="btn-prev-2" class="btn btn-secondary" style="flex:1;">Back</button>
+                <button type="button" id="btn-next-2" class="btn btn-primary" style="flex:1;">Continue</button>
+            </div>
+        </div>
+        
+        <!-- Step 3: Transfer review panel -->
+        <div class="card wizard-step" data-step="3" style="display:none;">
+            <h3 style="font-size:16px; font-weight:700; margin-bottom:12px;">3. Review Transfer</h3>
+            <p style="font-size:13px; color:var(--text-secondary); margin-bottom:24px;">Please review the transfer details before opening the final confirmation.</p>
+            
+            <!-- Summary Card -->
+            <div class="card" style="background:var(--surface); border:none; margin-bottom:24px; padding:16px; display:flex; flex-direction:column; gap:12px;">
+                <div style="display:flex; justify-content:space-between; gap:16px; font-size:14px;">
+                    <span style="color:var(--text-secondary);">From</span>
+                    <strong id="confirm-from">-</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:16px; font-size:14px;">
+                    <span style="color:var(--text-secondary);">To</span>
+                    <strong id="confirm-to">-</strong>
+                </div>
+                 <div style="display:flex; justify-content:space-between; gap:16px; font-size:14px; border-top:1px solid var(--border); padding-top:10px;">
+                    <span style="color:var(--text-secondary);">Transfer Method</span>
+                    <strong id="confirm-method">-</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:16px; font-size:14px;">
+                    <span style="color:var(--text-secondary);">Transfer Fee</span>
+                    <strong id="confirm-fee" style="color:var(--danger);">£0.00</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:16px; font-size:14px; border-top:1px dashed var(--border); padding-top:10px;">
+                    <span style="color:var(--text-secondary);">Total Debit</span>
+                    <strong id="confirm-total" style="font-size:18px; color:var(--primary);">£0.00</strong>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:16px; margin-top:8px;">
+                <button type="button" id="btn-prev-3" class="btn btn-secondary" style="width:50%;">Back to Details</button>
+                <button type="button" id="btn-confirm-transfer" class="btn btn-primary" style="width:50%;">Confirm Transfer</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Success Receipt -->
+    <div id="success-receipt" class="card" style="display:none; text-align:center; padding:40px; border-top: 5px solid var(--accent);">
+        <div style="width:64px; height:64px; border-radius:50%; background:var(--primary-glow); display:flex; align-items:center; justify-content:center; margin:0 auto 20px;">
+            <svg viewBox="0 0 24 24" width="36" height="36" fill="var(--accent-dark)"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        </div>
+        <h3 style="font-size:20px; font-weight:800; margin-bottom:8px;">Transfer Complete</h3>
+        <p style="color:var(--text-secondary); font-size:14px; margin-bottom:24px;">Your money has been debited and transferred instantly.</p>
+        <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary" style="width:100%;">Return to Dashboard</a>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block modals %}
+<div id="transfer-confirm-modal" class="cmd-palette-backdrop transfer-confirm-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="transfer-confirm-title" aria-describedby="transfer-confirm-note">
+    <div class="cmd-palette transfer-confirm-dialog">
+        <div class="transfer-confirm-header">
+            <h3 id="transfer-confirm-title">Confirm Money Transfer</h3>
+            <p id="transfer-confirm-note">Please check these details carefully. Confirming will debit your account immediately.</p>
+        </div>
+
+        <dl class="transfer-confirm-summary">
+            <div class="transfer-confirm-row">
+                <dt>From</dt>
+                <dd id="modal-confirm-from">-</dd>
+            </div>
+            <div class="transfer-confirm-row">
+                <dt>To</dt>
+                <dd id="modal-confirm-to">-</dd>
+            </div>
+            <div class="transfer-confirm-row">
+                <dt>Amount</dt>
+                <dd id="modal-confirm-amount">£0.00</dd>
+            </div>
+            <div class="transfer-confirm-row">
+                <dt>Fee</dt>
+                <dd id="modal-confirm-fee">£0.00</dd>
+            </div>
+            <div class="transfer-confirm-row total">
+                <dt>Total Debit</dt>
+                <dd id="modal-confirm-total">£0.00</dd>
+            </div>
+            <div class="transfer-confirm-row">
+                <dt>Reference</dt>
+                <dd id="modal-confirm-reference">-</dd>
+            </div>
+        </dl>
+
+        <div class="transfer-confirm-actions">
+            <button type="button" id="btn-cancel-transfer-modal" class="btn btn-secondary">Cancel</button>
+            <button type="button" id="btn-send-transfer-modal" class="btn btn-primary">Send Money</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/transfer.js') }}?v={{ range(1, 100000) | random }}"></script>
+{% endblock %}

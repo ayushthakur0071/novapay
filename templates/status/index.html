@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaPay - Public Cloud Telemetry Status Page</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            background-color: var(--surface);
+        }
+        .status-container {
+            width: 100%;
+            max-width: 680px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .status-header-card {
+            background-color: #00C896;
+            color: #FFFFFF;
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-weight: 700;
+        }
+        .status-header-card.degraded {
+            background-color: var(--accent-warm);
+        }
+        .status-header-card.outage {
+            background-color: var(--danger);
+        }
+        .component-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .component-row:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-container">
+    <!-- Header banner -->
+    <div id="status-header" class="status-header-card">
+        <div class="status-dot green" style="width:16px; height:16px; background:#FFFFFF;"></div>
+        <h2 style="font-size:18px; font-weight:800;">All Systems Operational</h2>
+    </div>
+    
+    <!-- Component health checks -->
+    <div class="card">
+        <h3 style="font-size:15px; font-weight:700; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:12px;">Component Status</h3>
+        
+        <div class="component-row">
+            <span style="font-size:14px; font-weight:600;">Core Banking App Engine</span>
+            <span id="cmp-app" style="color:var(--accent-dark); font-weight:700;">Operational</span>
+        </div>
+        <div class="component-row">
+            <span style="font-size:14px; font-weight:600;">Supabase Relational Database</span>
+            <span id="cmp-db" style="color:var(--accent-dark); font-weight:700;">Connected</span>
+        </div>
+        <div class="component-row">
+            <span style="font-size:14px; font-weight:600;">Active Cloud Active Node Routing</span>
+            <span id="cmp-routing" style="color:var(--primary); font-weight:700; text-transform:uppercase;">AWS</span>
+        </div>
+    </div>
+    
+    <!-- Incident history logs -->
+    <div class="card">
+        <h3 style="font-size:15px; font-weight:700; margin-bottom:16px;">Failover Incident Logs</h3>
+        <div id="incidents-box" style="display:flex; flex-direction:column; gap:12px; font-size:13px; color:var(--text-secondary);">
+            <p style="text-align:center; color:var(--text-muted);">Loading failover histories...</p>
+        </div>
+    </div>
+    
+    <div style="text-align:center;">
+        <a href="/login" style="font-size:13px; color:var(--primary); text-decoration:none; font-weight:600;">Back to Banking Portal</a>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    // 1. Fetch current health to update routing tags
+    fetch("/health")
+        .then(r => r.json())
+        .then(data => {
+            const header = document.getElementById("status-header");
+            const route = document.getElementById("cmp-routing");
+            
+            route.textContent = data.server.toUpperCase();
+            
+            if (data.status === "healthy") {
+                header.className = "status-header-card";
+                header.querySelector("h2").textContent = "All Systems Operational";
+            } else {
+                header.className = "status-header-card degraded";
+                header.querySelector("h2").textContent = "Systems Operating at Degraded Latency";
+                document.getElementById("cmp-app").textContent = "Degraded";
+                document.getElementById("cmp-app").style.color = "var(--accent-warm)";
+            }
+        })
+        .catch(() => {
+            const header = document.getElementById("status-header");
+            header.className = "status-header-card outage";
+            header.querySelector("h2").textContent = "Outage Event Detected";
+            document.getElementById("cmp-app").textContent = "Offline";
+            document.getElementById("cmp-app").style.color = "var(--danger)";
+        });
+
+    // 2. Load failover logs history
+    fetch("/api/failover/history")
+        .then(r => r.json())
+        .then(res => {
+            const box = document.getElementById("incidents-box");
+            if (res.success && res.data && res.data.length > 0) {
+                box.innerHTML = res.data.map(ev => `
+                    <div style="border-left:3px solid var(--accent); padding-left:12px; margin-bottom:12px;">
+                        <strong>Failover Incident Code: ${ev.id.substring(0,8)}</strong>
+                        <p style="margin-top:4px;">Failed over from ${ev.from_server.toUpperCase()} to ${ev.to_server.toUpperCase()} in ${parseFloat(ev.rto_seconds).toFixed(3)}s.</p>
+                        <span style="font-size:10px; color:var(--text-muted); display:block; margin-top:4px;">Triggered at: ${ev.triggered_at.replace('T', ' ').split('.')[0]}</span>
+                    </div>
+                `).join("");
+            } else {
+                box.innerHTML = `<p style="text-align:center; color:var(--text-muted);">No failover incident reports logged in the past 30 days.</p>`;
+            }
+        });
+});
+</script>
+</body>
+</html>

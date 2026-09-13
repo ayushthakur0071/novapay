@@ -1,0 +1,176 @@
+/* --------------------------------------------------------------------------
+   NovaPay CSS Animation Keyframes & Transition System
+-------------------------------------------------------------------------- */
+
+/* Balance Card Shimmer glare */
+@keyframes shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.balance-card {
+  background: linear-gradient(135deg, #0A2463 0%, #1E3A8A 50%, #0D3B8E 80%, #0A2463 100%);
+  background-size: 300% 300%;
+  animation: shimmer 6s ease-in-out infinite;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(10,36,99,0.3), 0 4px 16px rgba(10,36,99,0.15);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+}
+.balance-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 28px 60px rgba(10,36,99,0.4);
+}
+
+/* Page Entry Transitions */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.page-enter {
+  animation: fadeSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.card-enter {
+  animation: scaleIn 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Stagger Children */
+.stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger > *:nth-child(2) { animation-delay: 0.10s; }
+.stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger > *:nth-child(4) { animation-delay: 0.20s; }
+.stagger > *:nth-child(n+5) { animation-delay: calc(0.05s * var(--i, 5)); }
+
+/* Toast Notifications */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(120px) translateY(0); }
+  to   { opacity: 1; transform: translateX(0) translateY(0); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(120px); }
+}
+.toast {
+  animation: toastIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.toast.hiding {
+  animation: toastOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Loading Skeleton pulse */
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f0f4ff 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+  border-radius: 6px;
+  display: inline-block;
+  height: 1em;
+  width: 100%;
+}
+
+/* Modal overlays */
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-overlay {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.modal-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.modal-box {
+  animation: modalIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Slide-over details pane */
+@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes slideRight {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+.slide-over {
+  animation: slideLeft 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.slide-over.closing {
+  animation: slideRight 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Server Health Status live indicators */
+@keyframes statusPulseGreen {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 200, 150, 0.5); }
+  70%      { box-shadow: 0 0 0 8px rgba(0, 200, 150, 0); }
+}
+@keyframes statusPulseRed {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  70%      { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
+@keyframes statusPulseAmber {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+  70%      { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+}
+
+.status-dot.green {
+  background: #00C896;
+  animation: statusPulseGreen 2s infinite;
+}
+.status-dot.red {
+  background: #EF4444;
+  animation: statusPulseRed 2s infinite;
+}
+.status-dot.amber {
+  background: #F59E0B;
+  animation: statusPulseAmber 2s infinite;
+}
+
+/* Progress fillers */
+@keyframes progressFill {
+  from { width: 0; }
+  to   { width: var(--progress, 0%); }
+}
+.progress-bar-fill {
+  animation: progressFill 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Confetti Flyouts on successful payment */
+@keyframes confettiFly {
+  0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0); opacity: 0; }
+}
+.confetti-particle {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confettiFly 1.2s ease-out forwards;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Shake elements on error input */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.shake {
+  animation: shake 0.4s ease-in-out;
+}

@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay Admin - Command Center{% endblock %}
+
+{% block body_class %}admin-body{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="admin-page admin-dashboard-page stagger" data-admin-page="dashboard">
+    <section class="admin-hero-panel">
+        <div class="admin-hero-content">
+            <span class="admin-kicker">Control Room</span>
+            <h2>Administrative Dashboard</h2>
+            <p>Live customer governance, treasury movement, KYC pressure, and multi-cloud resilience in one operational view.</p>
+
+            <div class="admin-live-strip" aria-live="polite">
+                <span class="admin-live-dot"></span>
+                <strong id="admin-active-route">Connecting to active node</strong>
+                <span id="admin-health-summary">Checking database and routing health...</span>
+            </div>
+        </div>
+
+        <div class="admin-hero-actions">
+            <button type="button" class="btn btn-secondary admin-icon-button" id="admin-refresh-dashboard">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.7 6.3A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h8V3z"/></svg>
+                Refresh
+            </button>
+            <a href="{{ url_for('admin.users_list') }}" class="btn btn-primary admin-icon-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-3.2-6.4A5 5 0 1 0 8 13c-3.31 0-6 1.79-6 4v2h12v-2c0-1.03-.58-1.97-1.54-2.67A7.95 7.95 0 0 1 16 13c-1.2 0-2.33-.27-3.33-.75A4 4 0 0 0 16 11zm0 2c-2.67 0-5 1.34-5 3v3h10v-3c0-1.66-2.33-3-5-3z"/></svg>
+                Manage Users
+            </a>
+            <a href="{{ url_for('admin.monitoring_dashboard') }}" class="btn btn-secondary admin-icon-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v12H3zm2 2v8h14V6zm3 13h8v2H8zM7 9h3v3H7zm5-1h5v2h-5zm0 3h4v2h-4z"/></svg>
+                System Monitoring
+            </a>
+        </div>
+    </section>
+
+    <section id="admin-stats-box" class="admin-kpi-grid" aria-label="Administrative key metrics">
+        <button type="button" class="admin-kpi-card" data-admin-insight="Customer directory is live and ready for KYC triage.">
+            <span class="kpi-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-3.2-6.4A5 5 0 1 0 8 13c-3.31 0-6 1.79-6 4v2h12v-2c0-1.03-.58-1.97-1.54-2.67A7.95 7.95 0 0 1 16 13c-1.2 0-2.33-.27-3.33-.75A4 4 0 0 0 16 11zm0 2c-2.67 0-5 1.34-5 3v3h10v-3c0-1.66-2.33-3-5-3z"/></svg>
+            </span>
+            <span class="kpi-details">
+                <span>Total Customers</span>
+                <strong id="stat-users">0</strong>
+                <small id="stat-users-note">Loading directory</small>
+            </span>
+            <span class="admin-kpi-progress"><i id="stat-users-progress"></i></span>
+        </button>
+
+        <button type="button" class="admin-kpi-card" data-admin-insight="Total assets under management across all NovaPay accounts.">
+            <span class="kpi-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2zm-9-2h10V8H12zm4-2.5A1.5 1.5 0 1 1 16 10a1.5 1.5 0 0 1 0 3.5z"/></svg>
+            </span>
+            <span class="kpi-details">
+                <span>Total AUM</span>
+                <strong id="stat-aum">£0.00</strong>
+                <small id="stat-aum-note">Treasury snapshot</small>
+            </span>
+            <span class="admin-kpi-progress"><i id="stat-aum-progress"></i></span>
+        </button>
+
+        <button type="button" class="admin-kpi-card" data-admin-insight="Completed ledger activity available for audit.">
+            <span class="kpi-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 5h10V6H7zm0 5h10v-2H7zm0 4h7v-2H7z"/></svg>
+            </span>
+            <span class="kpi-details">
+                <span>Completed Txns</span>
+                <strong id="stat-txns">0</strong>
+                <small id="stat-txns-note">Ledger events settled</small>
+            </span>
+            <span class="admin-kpi-progress"><i id="stat-txns-progress"></i></span>
+        </button>
+
+        <button type="button" class="admin-kpi-card" data-admin-insight="Total exchanged value routed through the platform.">
+            <span class="kpi-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7zm1 0v9h8a9 9 0 0 0-8-9zm2 2.35A7.03 7.03 0 0 1 18.65 10H15z"/></svg>
+            </span>
+            <span class="kpi-details">
+                <span>Volume Exchanged</span>
+                <strong id="stat-volume">£0.00</strong>
+                <small id="stat-volume-note">Completed value flow</small>
+            </span>
+            <span class="admin-kpi-progress"><i id="stat-volume-progress"></i></span>
+        </button>
+    </section>
+
+    <p class="admin-insight-banner" id="admin-insight-banner">Tap a metric to inspect what it means for today’s operations.</p>
+
+    <section class="admin-dashboard-grid">
+        <article class="admin-ops-panel admin-ops-panel-large">
+            <header class="admin-panel-header">
+                <div>
+                    <span class="admin-kicker">User Ops</span>
+                    <h3>Customer Triage Queue</h3>
+                </div>
+                <a href="{{ url_for('admin.users_list') }}" class="admin-text-link">Open users</a>
+            </header>
+            <div class="admin-mini-stats">
+                <span><strong id="admin-approved-users">0</strong> approved</span>
+                <span><strong id="admin-pending-users">0</strong> pending</span>
+                <span><strong id="admin-locked-users">0</strong> locked</span>
+            </div>
+            <div class="admin-triage-list" id="admin-user-triage-list">
+                <div class="admin-skeleton-line"></div>
+                <div class="admin-skeleton-line short"></div>
+            </div>
+        </article>
+
+        <article class="admin-ops-panel">
+            <header class="admin-panel-header">
+                <div>
+                    <span class="admin-kicker">Resilience</span>
+                    <h3>Cloud Pulse</h3>
+                </div>
+                <a href="{{ url_for('admin.monitoring_dashboard') }}" class="admin-text-link">Monitor</a>
+            </header>
+            <div class="admin-node-preview-grid">
+                <div class="admin-node-preview" data-node-preview="aws">
+                    <span class="status-dot green" id="dashboard-aws-status"></span>
+                    <strong>AWS</strong>
+                    <small id="dashboard-aws-latency">0ms</small>
+                    <span class="admin-meter"><i id="dashboard-aws-meter"></i></span>
+                </div>
+                <div class="admin-node-preview" data-node-preview="azure">
+                    <span class="status-dot green" id="dashboard-azure-status"></span>
+                    <strong>Azure</strong>
+                    <small id="dashboard-azure-latency">0ms</small>
+                    <span class="admin-meter"><i id="dashboard-azure-meter"></i></span>
+                </div>
+            </div>
+            <p class="admin-panel-note" id="admin-cloud-note">Waiting for telemetry samples.</p>
+        </article>
+
+        <article class="admin-ops-panel">
+            <header class="admin-panel-header">
+                <div>
+                    <span class="admin-kicker">Controls</span>
+                    <h3>Operational Shortcuts</h3>
+                </div>
+            </header>
+            <div class="admin-action-stack">
+                <a href="{{ url_for('admin.users_list') }}" class="admin-action-row">
+                    <span>Review KYC queue</span>
+                    <strong id="admin-action-kyc-count">0 pending</strong>
+                </a>
+                <a href="{{ url_for('admin.monitoring_dashboard') }}" class="admin-action-row">
+                    <span>Inspect failover readiness</span>
+                    <strong id="admin-action-route">Live</strong>
+                </a>
+                <a href="{{ url_for('admin.txns_list') }}" class="admin-action-row">
+                    <span>Audit transaction ledger</span>
+                    <strong id="admin-action-ledger">Open</strong>
+                </a>
+            </div>
+        </article>
+
+        <article class="admin-ops-panel admin-ops-panel-large">
+            <header class="admin-panel-header">
+                <div>
+                    <span class="admin-kicker">Events</span>
+                    <h3>Latest System Activity</h3>
+                </div>
+                <button type="button" class="admin-chip-button" id="admin-refresh-activity">Refresh</button>
+            </header>
+            <div class="admin-event-stream" id="admin-dashboard-log-list">
+                <div class="admin-skeleton-line"></div>
+                <div class="admin-skeleton-line short"></div>
+            </div>
+        </article>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

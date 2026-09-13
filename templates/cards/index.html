@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - Cards Control Panel{% endblock %}
+
+{% block content %}
+<div class="stagger" style="display:flex; flex-direction:column; gap:32px;">
+    <div style="display:flex; justify-content:between; align-items:center;">
+        <div>
+            <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">Cards Control</h2>
+            <p style="color:var(--text-secondary); font-size:14px;">Configure limits, freeze cards, or issue new virtual debit cards.</p>
+        </div>
+        <button class="btn btn-primary" onclick="showIssueCardModal()">Issue Virtual Card</button>
+    </div>
+    
+    <!-- Cards Grid -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:32px;">
+        {% for card in cards %}
+        <!-- Card Widget Wrapper -->
+        <div style="display:flex; flex-direction:column; gap:20px;">
+            <!-- Realistic Card Frame -->
+            <div class="card {% if card.is_frozen %}frozen-card{% endif %}" style="background:linear-gradient(135deg, #0A2463 0%, #1E3A8A 100%); color:#FFFFFF; position:relative; min-height:200px; display:flex; flex-direction:column; justify-content:between; border:none; border-radius:20px; box-shadow:var(--shadow-card); overflow:hidden;">
+                {% if card.is_frozen %}
+                <div style="position:absolute; inset:0; background:rgba(15, 23, 42, 0.7); backdrop-filter:blur(3px); z-index:5; display:flex; align-items:center; justify-content:center;">
+                    <span style="font-size:18px; font-weight:800; border:2px solid #FFFFFF; padding:8px 16px; border-radius:8px; letter-spacing:1px; transform:rotate(-5deg);">FROZEN</span>
+                </div>
+                {% endif %}
+                
+                <div style="display:flex; justify-content:between; z-index:1;">
+                    <span style="font-size:11px; font-weight:700; opacity:0.8; letter-spacing:0.5px;">{{ card.card_type.upper() }} {{ card.card_network.upper() }}</span>
+                    <strong style="font-size:14px; color:var(--accent);">Visa</strong>
+                </div>
+                
+                <!-- Chip SVG -->
+                <div style="margin:12px 0; z-index:1;">
+                    <svg viewBox="0 0 100 80" width="45" height="35" style="fill:#F59E0B; opacity:0.9;">
+                        <rect x="5" y="5" width="90" height="70" rx="10" fill="#F59E0B" stroke="#B45309" stroke-width="2"/>
+                        <line x1="30" y1="5" x2="30" y2="75" stroke="#B45309" stroke-width="2"/>
+                        <line x1="70" y1="5" x2="70" y2="75" stroke="#B45309" stroke-width="2"/>
+                        <line x1="5" y1="40" x2="95" y2="40" stroke="#B45309" stroke-width="2"/>
+                    </svg>
+                </div>
+                
+                <div style="z-index:1;">
+                    <h3 id="card-num-{{ card.id }}" style="font-size:18px; font-family:'JetBrains Mono', monospace; font-weight:500; letter-spacing:1px; margin-bottom:12px;">{{ card.masked_number }}</h3>
+                    
+                    <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                        <div>
+                            <span style="font-size:8px; opacity:0.6; text-transform:uppercase; display:block;">Cardholder</span>
+                            <span id="cardholder-val-{{ card.id }}" style="font-size:13px; font-weight:600;">{{ card.cardholder_name }}</span>
+                        </div>
+                        <div>
+                            <span style="font-size:8px; opacity:0.6; text-transform:uppercase; display:block; text-align:center;">CVV</span>
+                            <span id="card-cvv-{{ card.id }}" style="font-size:13px; font-family:'JetBrains Mono', monospace; display:block; text-align:center;">***</span>
+                        </div>
+                        <div>
+                            <span style="font-size:8px; opacity:0.6; text-transform:uppercase; display:block; text-align:right;">Expires</span>
+                            <span id="expiry-val-{{ card.id }}" style="font-size:13px; font-family:'JetBrains Mono', monospace; display:block; text-align:right;">{{ "%02d" | format(card.expiry_month) }}/{{ card.expiry_year }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Card Controls -->
+            <div class="card" style="display:flex; flex-direction:column; gap:16px;">
+                <div style="display:flex; justify-content:between; align-items:center;">
+                    <span style="font-size:14px; font-weight:600;">Card Lock (Freeze)</span>
+                    <button class="btn {% if card.is_frozen %}btn-accent{% else %}btn-secondary{% endif %}" style="padding:6px 12px; font-size:12px;" onclick="toggleCardFreeze('{{ card.id }}')">
+                        {% if card.is_frozen %}Unlock{% else %}Freeze{% endif %}
+                    </button>
+                </div>
+                
+                <div style="border-top:1px solid var(--border); padding-top:12px;">
+                    <h4 style="font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:12px; text-transform:uppercase;">Security Limits</h4>
+                    <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+                        <label class="remember-me">
+                            <input type="checkbox" {% if card.contactless_enabled %}checked{% endif %} onchange="updateCardToggle('{{ card.id }}', 'contactless_enabled', this.checked)">
+                            <span>Enable Contactless Payments</span>
+                        </label>
+                        <label class="remember-me">
+                            <input type="checkbox" {% if card.online_payments_enabled %}checked{% endif %} onchange="updateCardToggle('{{ card.id }}', 'online_payments_enabled', this.checked)">
+                            <span>Enable Online Shopping Payments</span>
+                        </label>
+                        <label class="remember-me">
+                            <input type="checkbox" {% if card.international_payments %}checked{% endif %} onchange="updateCardToggle('{{ card.id }}', 'international_payments', this.checked)">
+                            <span>Enable International Usage</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div style="border-top:1px solid var(--border); padding-top:12px; display:flex; flex-direction:column; gap:6px;">
+                    <div style="display:flex; justify-content:between; font-size:13px;">
+                        <span style="font-weight:600; color:var(--text-secondary);">Daily Limit</span>
+                        <strong style="font-family:'JetBrains Mono', monospace;">£<span id="limit-val-{{ card.id }}">{{ card.daily_limit | int }}</span></strong>
+                    </div>
+                    <input type="range" min="100" max="5000" step="100" value="{{ card.daily_limit | int }}" style="width:100%;" onchange="updateCardLimit('{{ card.id }}', this.value)">
+                </div>
+                
+                <div style="border-top:1px solid var(--border); padding-top:12px; display:flex; justify-content:between; align-items:center;">
+                    <span style="font-size:13px; font-weight:600; color:var(--text-secondary);">Sensitive Data</span>
+                    <button class="btn btn-secondary" style="padding:6px 12px; font-size:12px; background:var(--surface); border-color:var(--primary);" onclick="revealCardDetails('{{ card.id }}', this)">Reveal Details</button>
+                </div>
+                
+                <div style="border-top:1px solid var(--border); padding-top:12px; text-align:right;">
+                    <button class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger); padding:6px 12px; font-size:12px;" onclick="cancelCard('{{ card.id }}')">Cancel Card</button>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card" style="text-align:center; padding:40px; grid-column:span 2;">
+            <p style="color:var(--text-secondary);">No active cards bound to your account.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Issue Card Modal -->
+<div id="issue-card-modal" class="cmd-palette-backdrop" style="display:none; align-items:center;">
+    <div class="cmd-palette" style="padding:24px; max-width:400px; width:100%;">
+        <h3 style="margin-bottom:16px; font-size:18px; font-weight:700;">Issue Virtual Debit Card</h3>
+        <form id="issue-card-form" onsubmit="handleIssueCard(event)">
+            <div class="form-group">
+                <label class="form-label" for="card-target-acc">Select Bound Account</label>
+                <select id="card-target-acc" class="form-control">
+                    {% for acc in accounts %}
+                    <option value="{{ acc.id }}">{{ acc.nickname }} ({{ acc.account_number }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display:flex; gap:12px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeIssueCardModal()">Cancel</button>
+                <button type="submit" id="btn-issue-card" class="btn btn-primary">Generate Card</button>
+            </div>
+        </form>
+<!-- Reveal Card Details Modal -->
+<div id="reveal-details-modal" class="cmd-palette-backdrop" style="display:none; align-items:center; justify-content:center; z-index:100;">
+    <div class="cmd-palette" style="padding:24px; max-width:420px; width:100%; border-radius:16px;">
+        <h3 style="margin-bottom:20px; font-size:18px; font-weight:700; display:flex; justify-content:space-between; align-items:center;">
+            <span>Virtual Card Credentials</span>
+            <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="closeRevealDetailsModal()">Close</button>
+        </h3>
+        
+        <div style="display:flex; flex-direction:column; gap:16px;">
+            <!-- Card Number -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <label style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;">Card Number</label>
+                <div style="display:flex; gap:8px;">
+                    <input id="reveal-card-num-input" class="form-control" readonly style="font-family:'JetBrains Mono', monospace; font-size:16px; letter-spacing:1px; background:var(--surface);" value="">
+                    <button class="btn btn-primary" onclick="copyCardField('reveal-card-num-input', this)" style="padding:0 16px;">Copy</button>
+                </div>
+            </div>
+            
+            <!-- Cardholder Name -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <label style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;">Cardholder Name</label>
+                <div style="display:flex; gap:8px;">
+                    <input id="reveal-cardholder-input" class="form-control" readonly style="font-family:'JetBrains Mono', monospace; background:var(--surface);" value="">
+                    <button class="btn btn-primary" onclick="copyCardField('reveal-cardholder-input', this)" style="padding:0 16px;">Copy</button>
+                </div>
+            </div>
+            
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <!-- Expiry Date -->
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <label style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;">Expiry Date</label>
+                    <div style="display:flex; gap:8px;">
+                        <input id="reveal-expiry-input" class="form-control" readonly style="font-family:'JetBrains Mono', monospace; background:var(--surface);" value="">
+                        <button class="btn btn-primary" onclick="copyCardField('reveal-expiry-input', this)" style="padding:0 12px;">Copy</button>
+                    </div>
+                </div>
+                
+                <!-- CVV -->
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <label style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;">CVV Code</label>
+                    <div style="display:flex; gap:8px;">
+                        <input id="reveal-cvv-input" class="form-control" readonly style="font-family:'JetBrains Mono', monospace; background:var(--surface);" value="">
+                        <button class="btn btn-primary" onclick="copyCardField('reveal-cvv-input', this)" style="padding:0 12px;">Copy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showIssueCardModal() {
+    document.getElementById("issue-card-modal").style.display = "flex";
+}
+function closeIssueCardModal() {
+    document.getElementById("issue-card-modal").style.display = "none";
+}
+
+function handleIssueCard(e) {
+    e.preventDefault();
+    const accountId = document.getElementById("card-target-acc").value;
+    const submitBtn = document.getElementById("btn-issue-card");
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    submitBtn.disabled = true;
+    
+    fetch("/api/cards", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({ account_id: accountId })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Virtual debit card issued successfully!", "accent");
+            if (typeof window.triggerConfetti === "function") window.triggerConfetti();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1200);
+        } else {
+            showToast(res.error.message || "Failed to issue card.", "error");
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(() => {
+        showToast("Network error.", "error");
+        submitBtn.disabled = false;
+    });
+}
+
+function toggleCardFreeze(cardId) {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    fetch(`/api/cards/${cardId}/freeze`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        }
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            const state = res.data.is_frozen ? "frozen" : "active";
+            showToast(`Card is now ${state}!`, "accent");
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    });
+}
+
+function updateCardToggle(cardId, settingField, value) {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    fetch(`/api/cards/${cardId}/settings`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({ [settingField]: value })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Card settings updated.", "accent");
+        }
+    });
+}
+
+function updateCardLimit(cardId, limit) {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    fetch(`/api/cards/${cardId}/settings`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({ daily_limit: limit })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            document.getElementById(`limit-val-${cardId}`).textContent = limit;
+            showToast(`Daily limit set to £${limit}`, "accent");
+        }
+    });
+}
+
+function cancelCard(cardId) {
+    if (!confirm("Are you sure you want to cancel this card completely? This action is irreversible.")) return;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    fetch(`/api/cards/${cardId}`, {
+        method: "DELETE",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        }
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Card cancelled successfully.", "info");
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    });
+}
+
+function revealCardDetails(cardId, btn) {
+    if (btn.dataset.revealed === "true") {
+        document.getElementById(`card-num-${cardId}`).textContent = btn.dataset.masked;
+        document.getElementById(`card-cvv-${cardId}`).textContent = "***";
+        btn.textContent = "Reveal Details";
+        btn.dataset.revealed = "false";
+        closeRevealDetailsModal();
+        return;
+    }
+    
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    btn.disabled = true;
+    btn.textContent = "Decrypting...";
+    
+    fetch(`/api/cards/${cardId}/reveal`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        }
+    })
+    .then(r => r.json())
+    .then(res => {
+        btn.disabled = false;
+        if (res.success) {
+            btn.dataset.masked = document.getElementById(`card-num-${cardId}`).textContent;
+            const rawNum = res.card_number;
+            const formatted = rawNum.replace(/(\d{4})/g, '$1 ').trim();
+            document.getElementById(`card-num-${cardId}`).textContent = formatted;
+            document.getElementById(`card-cvv-${cardId}`).textContent = res.cvv;
+            btn.textContent = "Hide Details";
+            btn.dataset.revealed = "true";
+            
+            // Populate and show the Copy Credentials Modal
+            document.getElementById("reveal-card-num-input").value = formatted;
+            document.getElementById("reveal-cardholder-input").value = document.getElementById(`cardholder-val-${cardId}`).textContent.trim();
+            document.getElementById("reveal-expiry-input").value = document.getElementById(`expiry-val-${cardId}`).textContent.trim();
+            document.getElementById("reveal-cvv-input").value = res.cvv;
+            document.getElementById("reveal-details-modal").style.display = "flex";
+        } else {
+            showToast(res.error.message || "Failed to reveal card details.", "error");
+            btn.textContent = "Reveal Details";
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        showToast("Network error.", "error");
+        btn.textContent = "Reveal Details";
+    });
+}
+
+function closeRevealDetailsModal() {
+    document.getElementById("reveal-details-modal").style.display = "none";
+    document.getElementById("reveal-card-num-input").value = "";
+    document.getElementById("reveal-cardholder-input").value = "";
+    document.getElementById("reveal-expiry-input").value = "";
+    document.getElementById("reveal-cvv-input").value = "";
+    
+    // Reset all buttons state
+    document.querySelectorAll("[data-revealed='true']").forEach(btn => {
+        const onclickAttr = btn.getAttribute("onclick");
+        if (onclickAttr) {
+            const match = onclickAttr.match(/'([^']+)'/);
+            if (match) {
+                const cardId = match[1];
+                document.getElementById(`card-num-${cardId}`).textContent = btn.dataset.masked;
+                document.getElementById(`card-cvv-${cardId}`).textContent = "***";
+                btn.textContent = "Reveal Details";
+                btn.dataset.revealed = "false";
+            }
+        }
+    });
+}
+
+function copyCardField(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input || !input.value) return;
+    
+    input.select();
+    input.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(input.value)
+        .then(() => {
+            const origText = btn.textContent;
+            btn.textContent = "Copied!";
+            btn.style.background = "var(--accent)";
+            btn.style.color = "#0F172A";
+            setTimeout(() => {
+                btn.textContent = origText;
+                btn.style.background = "";
+                btn.style.color = "";
+            }, 1500);
+        })
+        .catch(() => {
+            showToast("Failed to copy credentials.", "error");
+        });
+}
+</script>
+{% endblock %}

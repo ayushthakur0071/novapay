@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay Admin - Transaction Ledger Audit{% endblock %}
+
+{% block body_class %}admin-body{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="stagger" style="display:flex; flex-direction:column; gap:24px;">
+    <div>
+        <h2 style="font-size:24px; font-weight:800; color:var(--primary);">Master Transaction Ledger</h2>
+        <p style="color:var(--text-secondary); font-size:14px;">Audit transaction ledger logs across all customers and execute administrative reversals.</p>
+    </div>
+    
+    <!-- Ledger lists -->
+    <div class="admin-table-container">
+        <table class="admin-table" id="admin-txns-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Reference Code</th>
+                    <th>Sender/Receiver</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Actions Override</th>
+                </tr>
+            </thead>
+            <tbody id="admin-txns-tbody">
+                <tr>
+                    <td colspan="8" style="padding:40px; text-align:center; color:var(--text-secondary);">Loading transactions logs...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function loadTransactions() {
+    fetch("/api/admin/transactions")
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                renderTxnsTable(res.data);
+            }
+        });
+}
+
+function renderTxnsTable(txns) {
+    const tbody = document.getElementById("admin-txns-tbody");
+    if (txns.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="padding:40px; text-align:center; color:var(--text-secondary);">No ledger movements recorded.</td></tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = txns.map(t => {
+        const timeStr = t.created_at.split("T")[0] + " " + t.created_at.split("T")[1].substring(0,8);
+        const isReversable = t.status === "completed" && t.transaction_type !== "reversal";
+        
+        let recipientLabel = "External / Deposit";
+        if (t.user_full_name) {
+            recipientLabel = `${t.user_full_name} (${t.user_email})`;
+        }
+        
+        return `
+            <tr>
+                <td style="font-family:'JetBrains Mono', monospace; font-size:12px;">${timeStr}</td>
+                <td style="font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-secondary);">${t.transaction_ref}</td>
+                <td style="font-size:13px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${recipientLabel}</td>
+                <td style="font-weight:600;">${t.description}</td>
+                <td style="text-transform:uppercase; font-size:11px;"><span style="background:var(--surface); padding:2px 6px; border-radius:10px;">${t.category}</span></td>
+                <td style="font-family:'JetBrains Mono', monospace; font-weight:700;">£${t.amount.toFixed(2)}</td>
+                <td>
+                    <span style="font-size:11px; font-weight:700; color:${t.status === 'completed' ? 'var(--accent-dark)' : 'var(--danger)'};">
+                        ${t.status.toUpperCase()}
+                    </span>
+                </td>
+                <td style="text-align:right;">
+                    ${isReversable ? `
+                        <button class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger); padding:4px 8px; font-size:11px;" onclick="reverseTransaction('${t.id}')">Reverse</button>
+                    ` : '<span style="color:var(--text-muted); font-size:11px;">N/A</span>'}
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function reverseTransaction(id) {
+    if (!confirm("Are you sure you want to administratively reverse this transaction? A counter transaction will be generated instantly.")) return;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    fetch(`/api/admin/transactions/${id}/reverse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken }
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast(`Transaction reversed successfully. Reversal Ref: ${res.data.reversal_ref}`, "accent");
+            loadTransactions();
+        } else {
+            showToast(res.error.message || "Reversal failed.", "error");
+        }
+    });
+}
+
+document.addEventListener("DOMContentLoaded", loadTransactions);
+</script>
+{% endblock %}

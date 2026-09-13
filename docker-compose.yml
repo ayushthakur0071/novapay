@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # AWS Simulated Banking Server Node
+  aws_node:
+    build: .
+    command: python run.py --aws
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - FLASK_ENV=development
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+    restart: always
+
+  # Azure Simulated Banking Server Node
+  azure_node:
+    build: .
+    command: python run.py --azure
+    ports:
+      - "5002:5002"
+    environment:
+      - PORT=5002
+      - FLASK_ENV=development
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+    restart: always
+
+  # Proxy Server Router
+  proxy_balancer:
+    build: .
+    command: python proxy_server.py
+    ports:
+      - "8080:8080"
+    environment:
+      - PROXY_PORT=8080
+      - AWS_URL=http://aws_node:5001
+      - AZURE_URL=http://azure_node:5002
+      - PRIMARY_CLOUD=aws
+    depends_on:
+      - aws_node
+      - azure_node
+    restart: always
+
+  # Disaster Recovery & Telemetry Daemon
+  dr_daemon:
+    build: .
+    command: python monitoring_daemon.py
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - AWS_URL=http://aws_node:5001
+      - AZURE_URL=http://azure_node:5002
+      - PROXY_PORT=8080
+      - FAILOVER_THRESHOLD_MS=3000
+      - FAILOVER_FAILURE_COUNT=3
+      - MONITOR_INTERVAL_SECONDS=30
+    depends_on:
+      - proxy_balancer
+    restart: always

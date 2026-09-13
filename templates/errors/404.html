@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaPay - 404 Page Not Found</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <style>
+        body { display:flex; align-items:center; justify-content:center; height:100vh; background-color:var(--surface); }
+    </style>
+</head>
+<body>
+<button type="button" class="app-back-button error-back-button" data-back-button data-fallback-url="/" aria-label="Go back to previous page">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M15 18l-6-6 6-6" />
+    </svg>
+    <span>Back</span>
+</button>
+<div class="card page-enter" style="max-width:400px; text-align:center; padding:40px;">
+    <h1 style="font-size:72px; font-weight:800; color:var(--primary); margin-bottom:12px;">404</h1>
+    <h3 style="font-size:18px; font-weight:700; margin-bottom:12px;">Page Not Found</h3>
+    <p style="color:var(--text-secondary); font-size:14px; margin-bottom:24px;">The banking screen or API resource you are requesting does not exist.</p>
+    <a href="/" class="btn btn-primary" style="width:100%;">Return Home</a>
+</div>
+<script src="{{ url_for('static', filename='js/back-navigation.js') }}"></script>
+</body>
+</html>

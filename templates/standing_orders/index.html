@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - Standing Orders{% endblock %}
+
+{% block content %}
+<div class="stagger" style="display:flex; flex-direction:column; gap:32px;">
+    <div style="display:flex; justify-content:between; align-items:center;">
+        <div>
+            <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">Standing Orders</h2>
+            <p style="color:var(--text-secondary); font-size:14px;">Set up and monitor your automated recurring bill payments.</p>
+        </div>
+        <button class="btn btn-primary" onclick="showCreateOrderModal()">Create Standing Order</button>
+    </div>
+    
+    <!-- Active schedules list -->
+    <div class="card" style="padding:0; overflow:hidden;">
+        <table class="admin-table" style="width:100%; border-collapse:collapse;">
+            <thead>
+                <tr>
+                    <th style="padding:16px;">From Account</th>
+                    <th style="padding:16px;">Recipient Payee</th>
+                    <th style="padding:16px;">Amount</th>
+                    <th style="padding:16px;">Frequency</th>
+                    <th style="padding:16px;">Next Payment Date</th>
+                    <th style="padding:16px; text-align:right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for so in standing_orders %}
+                <tr>
+                    <td style="padding:16px; font-weight:600;">{{ so.accounts.nickname }} ({{ so.accounts.account_number }})</td>
+                    <td style="padding:16px;">{{ so.beneficiaries.nickname }} ({{ so.beneficiaries.full_name }})</td>
+                    <td style="padding:16px; font-family:'JetBrains Mono', monospace; font-weight:700;">£{{ so.amount }}</td>
+                    <td style="padding:16px; text-transform:capitalize;">{{ so.frequency }}</td>
+                    <td style="padding:16px; font-family:'JetBrains Mono', monospace;">{{ so.next_payment }}</td>
+                    <td style="padding:16px; text-align:right;">
+                        <button class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger); padding:6px 12px; font-size:12px;" onclick="cancelOrder('{{ so.id }}')">Cancel</button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="padding:40px; text-align:center; color:var(--text-secondary);">No active standing orders registered.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Create Order Modal -->
+<div id="create-so-modal" class="cmd-palette-backdrop" style="display:none; align-items:center;">
+    <div class="cmd-palette" style="padding:24px; max-width:420px; width:100%;">
+        <h3 style="margin-bottom:16px; font-size:18px; font-weight:700;">Create Standing Order</h3>
+        <form id="create-so-form" onsubmit="handleCreateOrder(event)">
+            <div class="form-group">
+                <label class="form-label" for="so-source">Select Source Account</label>
+                <select id="so-source" class="form-control" required>
+                    {% for acc in accounts %}
+                    <option value="{{ acc.id }}">{{ acc.nickname }} (Balance: £{{ acc.balance }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="so-payee">Select Recipient Payee</label>
+                <select id="so-payee" class="form-control" required>
+                    {% for ben in beneficiaries %}
+                    <option value="{{ ben.id }}">{{ ben.nickname }} ({{ ben.full_name }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="so-amount">Amount (£)</label>
+                <input id="so-amount" class="form-control" type="number" step="0.01" placeholder="0.00" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="so-ref">Reference</label>
+                <input id="so-ref" class="form-control" type="text" placeholder="e.g. Monthly Rent" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="so-freq">Frequency</label>
+                <select id="so-freq" class="form-control">
+                    <option value="monthly">Monthly</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="daily">Daily</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="so-start">Start Date</label>
+                <input id="so-start" class="form-control" type="date" required>
+            </div>
+            
+            <div style="display:flex; gap:12px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeCreateOrderModal()">Cancel</button>
+                <button type="submit" id="btn-so-submit" class="btn btn-primary">Create Schedule</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showCreateOrderModal() {
+    document.getElementById("create-so-modal").style.display = "flex";
+}
+function closeCreateOrderModal() {
+    document.getElementById("create-so-modal").style.display = "none";
+}
+
+function handleCreateOrder(e) {
+    e.preventDefault();
+    const source = document.getElementById("so-source").value;
+    const payee = document.getElementById("so-payee").value;
+    const amount = document.getElementById("so-amount").value;
+    const ref = document.getElementById("so-ref").value;
+    const freq = document.getElementById("so-freq").value;
+    const start = document.getElementById("so-start").value;
+    
+    const submitBtn = document.getElementById("btn-so-submit");
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    submitBtn.disabled = true;
+    
+    fetch("/api/standing-orders", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({
+            from_account_id: source,
+            beneficiary_id: payee,
+            amount: amount,
+            reference: ref,
+            frequency: freq,
+            start_date: start
+        })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Standing order created successfully!", "accent");
+            setTimeout(() => {
+                window.location.reload();
+            }, 1200);
+        } else {
+            showToast(res.error.message || "Failed to create schedule.", "error");
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(() => {
+        showToast("Network error.", "error");
+        submitBtn.disabled = false;
+    });
+}
+
+function cancelOrder(soId) {
+    if (!confirm("Are you sure you want to cancel this standing order schedule?")) return;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    fetch(`/api/standing-orders/${soId}`, {
+        method: "DELETE",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        }
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Standing order cancelled.", "info");
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    });
+}
+</script>
+{% endblock %}

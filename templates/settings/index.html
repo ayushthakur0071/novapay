@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - Account Settings{% endblock %}
+
+{% block content %}
+<div class="stagger" style="max-width:800px; margin:0 auto; display:flex; flex-direction:column; gap:32px;">
+    <div>
+        <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">Settings</h2>
+        <p style="color:var(--text-secondary); font-size:14px;">Personalize your preferences, toggle display theme, and manage security rules.</p>
+    </div>
+    
+    <div style="display:flex; flex-direction:column; gap:20px;">
+        <!-- Accordion 1: Appearance -->
+        <div class="card" style="padding:0; overflow:hidden;">
+            <button class="accordion-header" onclick="toggleAccordion('acc-theme')">
+                <span style="font-weight:700;">Appearance & Theme Settings</span>
+                <svg viewBox="0 0 24 24" width="18" height="18"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
+            </button>
+            <div id="acc-theme" class="accordion-content" style="padding:24px; display:block; border-top:1px solid var(--border);">
+                <div style="display:flex; justify-content:between; align-items:center;">
+                    <div>
+                        <h4 style="font-size:14px; font-weight:600; margin-bottom:4px;">Enable Dark Theme Mode</h4>
+                        <p style="font-size:12px; color:var(--text-secondary);">Toggle styling colors for dark environments.</p>
+                    </div>
+                    
+                    <label class="switch-container">
+                        <input type="checkbox" id="theme-toggle">
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Accordion 2: Notifications -->
+        <div class="card" style="padding:0; overflow:hidden;">
+            <button class="accordion-header" onclick="toggleAccordion('acc-notif')">
+                <span style="font-weight:700;">Notifications Preferences</span>
+                <svg viewBox="0 0 24 24" width="18" height="18"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
+            </button>
+            <div id="acc-notif" class="accordion-content" style="padding:24px; display:none; border-top:1px solid var(--border);">
+                <div style="display:flex; flex-direction:column; gap:16px;">
+                    <label class="remember-me">
+                        <input type="checkbox" checked>
+                        <span>Transaction Alert Notifications</span>
+                    </label>
+                    <label class="remember-me">
+                        <input type="checkbox" checked>
+                        <span>Security Lockout Warnings</span>
+                    </label>
+                    <label class="remember-me">
+                        <input type="checkbox">
+                        <span>Marketing Campaign Updates</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Accordion 3: Privacy & Session Control -->
+        <div class="card" style="padding:0; overflow:hidden;">
+            <button class="accordion-header" onclick="toggleAccordion('acc-privacy')">
+                <span style="font-weight:700;">Privacy & Session Toggles</span>
+                <svg viewBox="0 0 24 24" width="18" height="18"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
+            </button>
+            <div id="acc-privacy" class="accordion-content" style="padding:24px; display:none; border-top:1px solid var(--border);">
+                <div>
+                    <h4 style="font-size:14px; font-weight:600; margin-bottom:4px;">Manage Session Lifetime</h4>
+                    <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;">Automatic timeout is configured for 60 minutes for compliance safety.</p>
+                    <button class="btn btn-secondary" onclick="showToast('Your session has been renewed.', 'info')">Renew Session Token</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.accordion-header {
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-size: 15px;
+    color: var(--text-primary);
+    text-align: left;
+}
+.accordion-header svg {
+    fill: var(--text-secondary);
+    transition: transform 0.2s ease;
+}
+.accordion-header.active svg {
+    transform: rotate(180deg);
+}
+
+/* Switch styling */
+.switch-container {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
+}
+.switch-container input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: var(--border);
+  border-radius: 24px;
+  transition: .3s;
+}
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #FFFFFF;
+  border-radius: 50%;
+  transition: .3s;
+}
+input:checked + .switch-slider {
+  background-color: var(--accent);
+}
+input:checked + .switch-slider:before {
+  transform: translateX(24px);
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAccordion(id) {
+    const content = document.getElementById(id);
+    const header = content.previousElementSibling;
+    
+    const isOpen = content.style.display === "block";
+    
+    // Close all content first
+    document.querySelectorAll(".accordion-content").forEach(el => el.style.display = "none");
+    document.querySelectorAll(".accordion-header").forEach(el => el.classList.remove("active"));
+    
+    if (!isOpen) {
+        content.style.display = "block";
+        header.classList.add("active");
+    }
+}
+</script>
+{% endblock %}

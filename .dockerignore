@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+
+.venv/
+.venv-local/
+venv/
+__pycache__/
+*.py[cod]
+
+.git/
+.gitignore
+
+mock_emails.log
+*.log
+
+.DS_Store

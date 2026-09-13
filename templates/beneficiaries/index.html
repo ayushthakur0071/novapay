@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - Manage Beneficiaries{% endblock %}
+
+{% block content %}
+<div class="stagger" style="display:flex; flex-direction:column; gap:32px;">
+    <div style="display:flex; justify-content:between; align-items:center;">
+        <div>
+            <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">Beneficiaries</h2>
+            <p style="color:var(--text-secondary); font-size:14px;">Manage your list of trusted people and bill payees.</p>
+        </div>
+        <button class="btn btn-primary" onclick="showAddBeneficiaryModal()">Add Payee</button>
+    </div>
+    
+    <!-- Beneficiaries Grid -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:24px;">
+        {% for ben in beneficiaries %}
+        <div class="card" style="display:flex; flex-direction:column; justify-content:between; min-height:180px;">
+            <div>
+                <div style="display:flex; justify-content:between; align-items:start; margin-bottom:12px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div class="avatar-circle" style="background:var(--primary-glow); color:var(--primary);">
+                            {{ ben.nickname[:2].upper() }}
+                        </div>
+                        <div>
+                            <h3 style="font-size:16px; font-weight:700;">{{ ben.nickname }}</h3>
+                            <span style="font-size:12px; color:var(--text-secondary);">{{ ben.full_name }}</span>
+                        </div>
+                    </div>
+                    {% if ben.is_trusted %}
+                    <span style="font-size:10px; font-weight:700; color:var(--accent-dark); background:rgba(0, 200, 150, 0.1); padding:4px 8px; border-radius:12px;">TRUSTED</span>
+                    {% endif %}
+                </div>
+                
+                <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
+                    <p style="font-size:11px; opacity:0.7; text-transform:uppercase;">Bank: {{ ben.bank_name or 'Other Bank' }}</p>
+                    <p>Sort Code: {{ ben.sort_code }}</p>
+                    <p>Account: {{ ben.account_number }}</p>
+                </div>
+            </div>
+            
+            <div style="display:flex; justify-content:between; align-items:center; border-top:1px solid var(--border); padding-top:12px;">
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-secondary" style="padding:6px 12px; font-size:12px;" onclick="toggleTrust('{{ ben.id }}')">
+                        {% if ben.is_trusted %}Untrust{% else %}Trust{% endif %}
+                    </button>
+                    <button class="btn btn-secondary" style="padding:6px 12px; font-size:12px; border-color:var(--danger); color:var(--danger);" onclick="deleteBeneficiary('{{ ben.id }}')">Delete</button>
+                </div>
+                
+                <a href="/transactions/transfer" class="btn btn-accent" style="padding:6px 12px; font-size:12px;">Send</a>
+            </div>
+        </div>
+        {% else %}
+        <div class="card" style="text-align:center; padding:40px; grid-column:span 3;">
+            <p style="color:var(--text-secondary);">No payees registered yet. Register payees to make quick payments.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Add Beneficiary Modal -->
+<div id="add-ben-modal" class="cmd-palette-backdrop" style="display:none; align-items:center;">
+    <div class="cmd-palette" style="padding:24px; max-width:400px; width:100%;">
+        <h3 style="margin-bottom:16px; font-size:18px; font-weight:700;">Add Saved Payee</h3>
+        <form id="add-ben-form" onsubmit="handleAddBeneficiary(event)">
+            <div class="form-group">
+                <label class="form-label" for="ben-nickname">Nickname</label>
+                <input id="ben-nickname" class="form-control" type="text" placeholder="e.g. Liam Smith" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="ben-fullname">Full Name (Legal Account Name)</label>
+                <input id="ben-fullname" class="form-control" type="text" placeholder="e.g. Liam John Smith" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="ben-bank">Bank Name</label>
+                <input id="ben-bank" class="form-control" type="text" placeholder="e.g. Barclays Bank" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="ben-sort">Sort Code</label>
+                <input id="ben-sort" class="form-control" type="text" placeholder="XX-XX-XX" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="ben-account">Account Number</label>
+                <input id="ben-account" class="form-control" type="text" placeholder="8 digits" required>
+            </div>
+            <div style="display:flex; gap:12px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeAddBeneficiaryModal()">Cancel</button>
+                <button type="submit" id="btn-add-ben" class="btn btn-primary">Add Beneficiary</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showAddBeneficiaryModal() {
+    document.getElementById("add-ben-modal").style.display = "flex";
+}
+function closeAddBeneficiaryModal() {
+    document.getElementById("add-ben-modal").style.display = "none";
+}
+
+function handleAddBeneficiary(e) {
+    e.preventDefault();
+    const nickname = document.getElementById("ben-nickname").value;
+    const fullname = document.getElementById("ben-fullname").value;
+    const bank = document.getElementById("ben-bank").value;
+    const sort = document.getElementById("ben-sort").value;
+    const account = document.getElementById("ben-account").value;
+    const submitBtn = document.getElementById("btn-add-ben");
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    submitBtn.disabled = true;
+    
+    fetch("/api/beneficiaries", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({
+            nickname: nickname,
+            full_name: fullname,
+            bank_name: bank,
+            sort_code: sort,
+            account_number: account
+        })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Beneficiary saved successfully!", "accent");
+            setTimeout(() => {
+                window.location.reload();
+            }, 1200);
+        } else {
+            showToast(res.error.message || "Failed to save beneficiary.", "error");
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(() => {
+        showToast("Network error.", "error");
+        submitBtn.disabled = false;
+    });
+}
+
+function toggleTrust(benId) {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    fetch(`/api/beneficiaries/${benId}/trust`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        }
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            const state = res.data.is_trusted ? "trusted" : "untrusted";
+            showToast(`Payee marked ${state}!`, "accent");
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    });
+}
+
+function deleteBeneficiary(benId) {
+    if (!confirm("Are you sure you want to delete this saved payee?")) return;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    fetch(`/api/beneficiaries/${benId}`, {
+        method: "DELETE",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        }
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Beneficiary deleted successfully.", "info");
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    });
+}
+</script>
+{% endblock %}

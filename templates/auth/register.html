@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - Open Secure Banking Account{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}?v={{ range(1, 100000) | random }}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-container" style="position:fixed; inset:0; z-index:1000;">
+    <!-- Left Hero Column -->
+    <div class="auth-hero">
+        <div class="floating-circle-1"></div>
+        <div class="floating-circle-2"></div>
+        
+        <div class="auth-hero-content">
+            <div class="auth-logo">
+                <svg viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#00C896" stroke-width="8"/>
+                    <polygon points="40,35 68,50 40,65" fill="#00C896" />
+                </svg>
+                <h1>NovaPay</h1>
+            </div>
+            
+            <h2 class="auth-hero-title">Open Your Resilient Banking Account</h2>
+            <p style="color:#E2E8F0; margin-bottom:40px; font-size:16px;">
+                Complete our secure 3-step registration wizard to unlock active checking and savings products.
+            </p>
+        </div>
+    </div>
+    
+    <!-- Right Form Wizard Column -->
+    <div class="auth-form-panel">
+        <div class="auth-header">
+            <h2>Create Account</h2>
+            <p>Already have an account? <a href="{{ url_for('auth.login') }}">Log In</a></p>
+        </div>
+        
+        <!-- Wizard step bar indicator -->
+        <div class="step-progress">
+            <div class="step-dot active" id="dot-1"></div>
+            <div class="step-dot" id="dot-2"></div>
+            <div class="step-dot" id="dot-3"></div>
+            <div class="step-dot" id="dot-4"></div>
+        </div>
+        
+        <form id="register-form" onsubmit="handleRegistration(event)">
+            <!-- Step 1: Personal Info -->
+            <div class="auth-step active" id="step-1">
+                <div class="form-group">
+                    <label class="form-label" for="reg-name">Full Name</label>
+                    <input id="reg-name" class="form-control" type="text" placeholder="John Doe" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="reg-email">Email Address</label>
+                    <input id="reg-email" class="form-control" type="email" placeholder="you@domain.com" required onblur="checkEmailAvailability()" oninput="emailValid = false;">
+                    <span id="email-error" style="color:var(--danger); font-size:11px; display:none; margin-top:4px;"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="reg-phone">Phone Number</label>
+                    <input id="reg-phone" class="form-control" type="tel" placeholder="e.g. 07123456789" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="reg-dob">Date of Birth</label>
+                    <input id="reg-dob" class="form-control" type="date" required>
+                </div>
+                
+                <button type="button" class="btn btn-primary" style="width:100%; margin-top:10px; padding:14px;" onclick="validateStep1()">Continue</button>
+            </div>
+            
+            <!-- Step 2: Address Info -->
+            <div class="auth-step" id="step-2">
+                <div class="form-group">
+                    <label class="form-label" for="reg-addr">Street Address</label>
+                    <input id="reg-addr" class="form-control" type="text" placeholder="12 Baker St" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="reg-city">City</label>
+                    <input id="reg-city" class="form-control" type="text" placeholder="London" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="reg-postcode">Postcode</label>
+                    <input id="reg-postcode" class="form-control" type="text" placeholder="W1A 1AA" required>
+                </div>
+                
+                <div style="display:flex; gap:16px; margin-top:20px;">
+                    <button type="button" class="btn btn-secondary" style="flex:1; padding:14px;" onclick="goToStep(1)">Back</button>
+                    <button type="button" class="btn btn-primary" style="flex:1; padding:14px;" onclick="validateStep2()">Continue</button>
+                </div>
+            </div>
+            
+            <!-- Step 3: Identity Verification (MANDATORY ID SCAN) -->
+            <div class="auth-step" id="step-3">
+                <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px; line-height:1.4;">
+                    NovaPay compliance regulations require a valid government-issued photo identity verification scan.
+                </p>
+                <div class="form-group">
+                    <label class="form-label" for="reg-doc-type">Document Type</label>
+                    <select id="reg-doc-type" class="form-control" style="background:var(--surface); color:var(--text-primary); cursor:pointer;">
+                        <option value="Passport">Passport</option>
+                        <option value="Driving License">Driving License</option>
+                        <option value="National Identity Card">National Identity Card</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="reg-doc-file">Upload Identity Scan (Image)</label>
+                    <input id="reg-doc-file" class="form-control" type="file" accept="image/*" required onchange="handleIDScanUpload(this)">
+                    <input type="hidden" id="reg-doc-base64">
+                    
+                    <div id="id-scan-preview-box" style="margin-top:16px; display:none; flex-direction:column; align-items:center; background:var(--surface); border:1px dashed var(--border); padding:10px; border-radius:var(--radius-md);">
+                        <span style="font-size:10px; color:var(--text-muted); margin-bottom:8px;">Uploaded Document Preview</span>
+                        <img id="id-scan-preview" src="" alt="ID Preview" style="max-height:140px; max-width:100%; border-radius:4px; box-shadow:var(--shadow-sm);">
+                    </div>
+                </div>
+                
+                <div style="display:flex; gap:16px; margin-top:20px;">
+                    <button type="button" class="btn btn-secondary" style="flex:1; padding:14px;" onclick="goToStep(2)">Back</button>
+                    <button type="button" class="btn btn-primary" style="flex:1; padding:14px;" onclick="validateStep3()">Continue</button>
+                </div>
+            </div>
+            
+            <!-- Step 4: Security & Password -->
+            <div class="auth-step" id="step-4">
+                <div class="form-group">
+                    <label class="form-label" for="reg-pass">Create Password</label>
+                    <input id="reg-pass" class="form-control" type="password" placeholder="••••••••" required oninput="checkPassStrength()">
+                    
+                    <div class="password-strength-container" id="strength-container">
+                        <div class="password-strength-bar">
+                            <div class="strength-segment"></div>
+                            <div class="strength-segment"></div>
+                            <div class="strength-segment"></div>
+                            <div class="strength-segment"></div>
+                        </div>
+                        <span class="strength-text" id="strength-text">Password Strength</span>
+                    </div>
+                    
+                    <ul class="password-requirements" style="list-style:none; padding:0; margin:12px 0 0; font-size:11px; display:flex; flex-direction:column; gap:6px;">
+                        <li id="req-length" style="color:var(--text-muted); display:flex; align-items:center; gap:6px;">
+                            <span class="bullet" style="width:6px; height:6px; border-radius:50%; background:var(--text-muted); display:inline-block;"></span> At least 8 characters
+                        </li>
+                        <li id="req-case" style="color:var(--text-muted); display:flex; align-items:center; gap:6px;">
+                            <span class="bullet" style="width:6px; height:6px; border-radius:50%; background:var(--text-muted); display:inline-block;"></span> Uppercase & lowercase letters
+                        </li>
+                        <li id="req-number" style="color:var(--text-muted); display:flex; align-items:center; gap:6px;">
+                            <span class="bullet" style="width:6px; height:6px; border-radius:50%; background:var(--text-muted); display:inline-block;"></span> At least one number
+                        </li>
+                        <li id="req-special" style="color:var(--text-muted); display:flex; align-items:center; gap:6px;">
+                            <span class="bullet" style="width:6px; height:6px; border-radius:50%; background:var(--text-muted); display:inline-block;"></span> At least one special character
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="reg-confirm">Confirm Password</label>
+                    <input id="reg-confirm" class="form-control" type="password" placeholder="••••••••" required>
+                </div>
+                
+                <div class="auth-options" style="margin-bottom:20px;">
+                    <label class="remember-me">
+                        <input type="checkbox" id="reg-tc" required>
+                        <span>I accept terms and conditions</span>
+                    </label>
+                </div>
+                
+                <div style="display:flex; gap:16px;">
+                    <button type="button" class="btn btn-secondary" style="flex:1; padding:14px;" onclick="goToStep(3)">Back</button>
+                    <button type="submit" id="btn-reg-submit" class="btn btn-primary" style="flex:1; padding:14px;">Register</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let emailValid = false;
+
+function goToStep(num) {
+    document.querySelectorAll(".auth-step").forEach(step => step.classList.remove("active"));
+    document.querySelectorAll(".step-dot").forEach(dot => dot.classList.remove("active"));
+    
+    document.getElementById(`step-${num}`).classList.add("active");
+    for (let i = 1; i <= num; i++) {
+        document.getElementById(`dot-${i}`).classList.add("active");
+    }
+}
+
+function checkEmailAvailability() {
+    const email = document.getElementById("reg-email").value.trim();
+    const errSpan = document.getElementById("email-error");
+    if (!email) return;
+    
+    fetch(`/api/auth/check-email?email=${encodeURIComponent(email)}`)
+        .then(r => r.json())
+        .then(res => {
+            if (res.success && !res.available) {
+                errSpan.textContent = "Email is already in use.";
+                errSpan.style.display = "block";
+                emailValid = false;
+            } else {
+                errSpan.style.display = "none";
+                emailValid = true;
+            }
+        });
+}
+
+function validateStep1() {
+    const name = document.getElementById("reg-name").value;
+    const email = document.getElementById("reg-email").value;
+    const phone = document.getElementById("reg-phone").value;
+    const dob = document.getElementById("reg-dob").value;
+    
+    if (!name || !email || !phone || !dob) {
+        showToast("Please complete all personal details.", "error");
+        return;
+    }
+    
+    if (!emailValid) {
+        showToast("This email address is already registered or invalid.", "error");
+        return;
+    }
+    
+    // Validate age 18+
+    const dobDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - dobDate.getFullYear();
+    const m = today.getMonth() - dobDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+        age--;
+    }
+    
+    if (age < 18) {
+        showToast("You must be at least 18 years old to register.", "error");
+        return;
+    }
+    
+    goToStep(2);
+}
+
+function validateStep2() {
+    const addr = document.getElementById("reg-addr").value;
+    const city = document.getElementById("reg-city").value;
+    const post = document.getElementById("reg-postcode").value;
+    
+    if (!addr || !city || !post) {
+        showToast("Please complete all address details.", "error");
+        return;
+    }
+    goToStep(3);
+}
+
+function handleIDScanUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+        showToast("Only image files are accepted for ID verification scans.", "error");
+        input.value = "";
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById("reg-doc-base64").value = e.target.result;
+        document.getElementById("id-scan-preview").src = e.target.result;
+        document.getElementById("id-scan-preview-box").style.display = "flex";
+    };
+    reader.readAsDataURL(file);
+}
+
+function validateStep3() {
+    const docBase64 = document.getElementById("reg-doc-base64").value;
+    if (!docBase64) {
+        showToast("Please upload a photo scan of your identity document.", "error");
+        return;
+    }
+    goToStep(4);
+}
+
+function updateRequirement(elem, met) {
+    const bullet = elem.querySelector(".bullet");
+    if (met) {
+        elem.style.color = "var(--accent)";
+        bullet.style.background = "var(--accent)";
+    } else {
+        elem.style.color = "var(--danger)";
+        bullet.style.background = "var(--danger)";
+    }
+}
+
+function resetRequirement(elem) {
+    const bullet = elem.querySelector(".bullet");
+    elem.style.color = "var(--text-muted)";
+    bullet.style.background = "var(--text-muted)";
+}
+
+function checkPassStrength() {
+    const pass = document.getElementById("reg-pass").value;
+    const container = document.getElementById("strength-container");
+    const label = document.getElementById("strength-text");
+    
+    const reqLength = document.getElementById("req-length");
+    const reqCase = document.getElementById("req-case");
+    const reqNumber = document.getElementById("req-number");
+    const reqSpecial = document.getElementById("req-special");
+    
+    container.className = "password-strength-container";
+    
+    if (!pass) {
+        label.textContent = "Password Strength";
+        resetRequirement(reqLength);
+        resetRequirement(reqCase);
+        resetRequirement(reqNumber);
+        resetRequirement(reqSpecial);
+        return;
+    }
+    
+    const hasLength = pass.length >= 8;
+    const hasCase = /[A-Z]/.test(pass) && /[a-z]/.test(pass);
+    const hasNumber = /\d/.test(pass);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+    
+    updateRequirement(reqLength, hasLength);
+    updateRequirement(reqCase, hasCase);
+    updateRequirement(reqNumber, hasNumber);
+    updateRequirement(reqSpecial, hasSpecial);
+    
+    let score = 0;
+    if (hasLength) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[a-z]/.test(pass)) score++;
+    if (hasNumber) score++;
+    if (hasSpecial) score++;
+    
+    if (score <= 2) {
+        container.classList.add("strength-weak");
+        label.textContent = "Weak Password";
+    } else if (score === 3) {
+        container.classList.add("strength-fair");
+        label.textContent = "Fair Password";
+    } else if (score === 4) {
+        container.classList.add("strength-good");
+        label.textContent = "Good Password";
+    } else {
+        container.classList.add("strength-strong");
+        label.textContent = "Strong Password";
+    }
+}
+
+function handleRegistration(e) {
+    e.preventDefault();
+    const pass = document.getElementById("reg-pass").value;
+    const confirm = document.getElementById("reg-confirm").value;
+    const tc = document.getElementById("reg-tc").checked;
+    
+    const hasLength = pass.length >= 8;
+    const hasCase = /[A-Z]/.test(pass) && /[a-z]/.test(pass);
+    const hasNumber = /\d/.test(pass);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+    
+    if (!(hasLength && hasCase && hasNumber && hasSpecial)) {
+        showToast("Password does not meet the security requirements.", "error");
+        return;
+    }
+    if (pass !== confirm) {
+        showToast("Passwords do not match.", "error");
+        return;
+    }
+    if (!tc) {
+        showToast("Please accept the T&C.", "error");
+        return;
+    }
+    
+    const body = {
+        full_name: document.getElementById("reg-name").value,
+        email: document.getElementById("reg-email").value,
+        phone: document.getElementById("reg-phone").value,
+        date_of_birth: document.getElementById("reg-dob").value,
+        address: document.getElementById("reg-addr").value,
+        city: document.getElementById("reg-city").value,
+        postcode: document.getElementById("reg-postcode").value,
+        kyc_document_type: document.getElementById("reg-doc-type").value,
+        kyc_document_file: document.getElementById("reg-doc-base64").value,
+        password: pass
+    };
+    
+    const submitBtn = document.getElementById("btn-reg-submit");
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Creating Account...";
+    
+    fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("Registration submitted for verification!", "accent");
+            if (typeof window.triggerConfetti === "function") {
+                window.triggerConfetti();
+            }
+            setTimeout(() => {
+                alert("Your account creation request was successfully received. Our compliance team will review your uploaded identity documents. You will be able to log in once your status is verified.");
+                window.location.href = "/login";
+            }, 1000);
+        } else {
+            showToast(res.error.message || "Registration failed.", "error");
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Register";
+        }
+    })
+    .catch(() => {
+        showToast("Network error during registration.", "error");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Register";
+    });
+}
+</script>
+{% endblock %}

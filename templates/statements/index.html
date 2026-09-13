@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - Bank Statements{% endblock %}
+
+{% block content %}
+<div class="stagger" style="display:flex; flex-direction:column; gap:32px;">
+    <div>
+        <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">Bank Statements</h2>
+        <p style="color:var(--text-secondary); font-size:14px;">Select an account and period to generate and preview statements.</p>
+    </div>
+    
+    <!-- Filter Bar Card -->
+    <div class="card" style="padding:16px;">
+        <form method="GET" style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+            <div class="form-group" style="margin-bottom:0; flex:1.5; min-width:200px;">
+                <label class="form-label" for="stmt-acc">Select Account</label>
+                <select id="stmt-acc" name="account_id" class="form-control">
+                    {% for acc in accounts %}
+                    <option value="{{ acc.id }}" {% if acc.id == selected_account_id %}selected{% endif %}>
+                        {{ acc.nickname }} ({{ acc.account_number }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-bottom:0; flex:1; min-width:140px;">
+                <label class="form-label" for="stmt-month">Statement Month</label>
+                <input id="stmt-month" name="month" class="form-control" type="month" value="{{ month_val or '' }}">
+            </div>
+            
+            <div style="display:flex; gap:12px; flex:1; min-width:180px;">
+                <button type="submit" class="btn btn-primary" style="flex:1;">Generate Statement</button>
+                <a href="/api/transactions/export" class="btn btn-secondary">Export CSV</a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Statement Sheet Preview -->
+    <div class="card" style="padding:32px; display:flex; flex-direction:column; gap:24px; border: 1px solid var(--border);">
+        <div style="display:flex; justify-content:between; align-items:start; border-bottom:1px solid var(--border); padding-bottom:20px;">
+            <div>
+                <h3 style="font-size:20px; font-weight:800; color:var(--primary);">NovaPay Statement</h3>
+                <span style="font-size:12px; color:var(--text-muted);">Period: {% if month_val %}{{ month_val }}{% else %}All Time (Latest 100){% endif %}</span>
+            </div>
+            <div style="text-align:right;">
+                <h4 style="font-size:14px; font-weight:700;">Customer</h4>
+                <span style="font-size:13px; color:var(--text-secondary);">{{ current_user.full_name }}</span>
+            </div>
+        </div>
+        
+        <!-- Opening and Closing summaries -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:20px; background:var(--surface); padding:16px; border-radius:12px;">
+            <div>
+                <span style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Opening Balance</span>
+                <strong style="font-size:18px; font-family:'JetBrains Mono', monospace; display:block; margin-top:4px;">£{{ "%.2f" | format(opening_balance) }}</strong>
+            </div>
+            <div>
+                <span style="font-size:11px; color:var(--text-secondary); text-transform:uppercase;">Closing Balance</span>
+                <strong style="font-size:18px; font-family:'JetBrains Mono', monospace; display:block; margin-top:4px;">£{{ "%.2f" | format(closing_balance) }}</strong>
+            </div>
+        </div>
+        
+        <!-- Transactions table -->
+        <div style="overflow-x:auto;">
+            <table class="admin-table" style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th style="padding:12px;">Date</th>
+                        <th style="padding:12px;">Reference Code</th>
+                        <th style="padding:12px;">Description</th>
+                        <th style="padding:12px;">Category</th>
+                        <th style="padding:12px; text-align:right;">Amount</th>
+                        <th style="padding:12px; text-align:right;">Balance After</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for txn in transactions %}
+                    {% set isCredit = txn.transaction_type == 'deposit' or (txn.to_account_id | string == selected_account_id) %}
+                    <tr>
+                        <td style="padding:12px; font-family:'JetBrains Mono', monospace; font-size:13px;">{{ txn.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td style="padding:12px; font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--text-secondary);">{{ txn.transaction_ref }}</td>
+                        <td style="padding:12px; font-weight:600;">{{ txn.description }}</td>
+                        <td style="padding:12px; text-transform:uppercase; font-size:11px;"><span style="background:var(--surface); padding:2px 6px; border-radius:10px;">{{ txn.category }}</span></td>
+                        <td style="padding:12px; text-align:right; font-family:'JetBrains Mono', monospace; font-weight:700; color:{% if isCredit %}var(--accent-dark){% else %}var(--text-primary){% endif %};">
+                            {% if isCredit %}+{% else %}-{% endif %}£{{ "%.2f" | format(txn.amount) }}
+                        </td>
+                        <td style="padding:12px; text-align:right; font-family:'JetBrains Mono', monospace;">
+                            {% if txn.balance_after is not none %}£{{ "%.2f" | format(txn.balance_after) }}{% else %}-{% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="padding:40px; text-align:center; color:var(--text-secondary);">No ledger movements recorded during this period.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

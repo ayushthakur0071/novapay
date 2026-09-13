@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - Transaction History{% endblock %}
+
+{% block content %}
+<div class="stagger" style="display:flex; flex-direction:column; gap:24px;">
+    <div style="display:flex; justify-content:between; align-items:center; flex-wrap:wrap; gap:16px;">
+        <div>
+            <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">Transaction History</h2>
+            <p style="color:var(--text-secondary); font-size:14px;">Browse and filter your complete banking ledger statements.</p>
+        </div>
+        <div style="display:flex; gap:12px;">
+            <a href="/api/transactions/export" class="btn btn-secondary">Export Statement (CSV)</a>
+        </div>
+    </div>
+    
+    <!-- Filters Card -->
+    <div class="card" style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; padding:16px;">
+        <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;">
+            <label class="form-label" for="filter-acc">Select Account</label>
+            <select id="filter-acc" class="form-control" onchange="loadFilteredHistory()">
+                <option value="">All Accounts</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}">{{ acc.nickname }} ({{ acc.account_number }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group" style="margin-bottom:0; flex:1; min-width:140px;">
+            <label class="form-label" for="filter-category">Category</label>
+            <select id="filter-category" class="form-control" onchange="loadFilteredHistory()">
+                <option value="">All Categories</option>
+                <option value="salary">Salary</option>
+                <option value="bills">Bills</option>
+                <option value="shopping">Shopping</option>
+                <option value="eating_out">Eating Out</option>
+                <option value="transport">Transport</option>
+                <option value="entertainment">Entertainment</option>
+                <option value="health">Health</option>
+                <option value="travel">Travel</option>
+                <option value="savings">Savings</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+        
+        <div class="form-group" style="margin-bottom:0; flex:1; min-width:140px;">
+            <label class="form-label" for="filter-type">Type</label>
+            <select id="filter-type" class="form-control" onchange="loadFilteredHistory()">
+                <option value="">All Types</option>
+                <option value="credit">Money In (Credits)</option>
+                <option value="debit">Money Out (Debits)</option>
+            </select>
+        </div>
+        
+        <div class="form-group" style="margin-bottom:0; flex:1.5; min-width:200px;">
+            <label class="form-label" for="filter-search">Keyword Search</label>
+            <input id="filter-search" class="form-control" type="text" placeholder="Search merchant, reference..." oninput="debounce(loadFilteredHistory, 300)()">
+        </div>
+    </div>
+    
+    <!-- Ledger List -->
+    <div class="card" style="padding:0; overflow:hidden;">
+        <div id="history-rows-box" style="display:flex; flex-direction:column;">
+            <!-- Rendered live via JS -->
+            <p style="text-align:center; padding:40px; color:var(--text-secondary);">Loading transaction histories...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Slide-Over Details Drawer -->
+<div id="details-slideover" style="display:none; position:fixed; right:0; top:0; height:100vh; width:360px; background-color:var(--card); border-left:1px solid var(--border); box-shadow:var(--shadow-card); z-index:1000; padding:32px; display:flex; flex-direction:column; justify-content:between;">
+    <div>
+        <div style="display:flex; justify-content:between; align-items:center; margin-bottom:24px;">
+            <h3 style="font-size:18px; font-weight:800;">Transaction Details</h3>
+            <button onclick="closeDetailsSlide()" style="background:none; border:none; cursor:pointer; font-size:24px; color:var(--text-muted);">&times;</button>
+        </div>
+        
+        <div style="text-align:center; margin-bottom:32px;">
+            <div id="detail-icon" style="font-size:32px; margin-bottom:8px;">💳</div>
+            <h4 id="detail-desc" style="font-size:20px; font-weight:700; margin-bottom:4px;">Merchant name</h4>
+            <span id="detail-date" style="font-size:12px; color:var(--text-muted);">2025-06-18</span>
+        </div>
+        
+        <div style="display:flex; flex-direction:column; gap:16px; font-size:14px;">
+            <div style="display:flex; justify-content:between; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                <span style="color:var(--text-secondary);">Reference ID</span>
+                <strong id="detail-ref" style="font-family:'JetBrains Mono', monospace;">TXN-...</strong>
+            </div>
+            <div style="display:flex; justify-content:between; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                <span style="color:var(--text-secondary);">Type</span>
+                <strong id="detail-type">Debit</strong>
+            </div>
+            <div style="display:flex; justify-content:between; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                <span style="color:var(--text-secondary);">Category</span>
+                <strong id="detail-category" style="text-transform:uppercase;">Shopping</strong>
+            </div>
+            <div style="display:flex; justify-content:between; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                <span style="color:var(--text-secondary);">Transfer Channel</span>
+                <strong id="detail-method">-</strong>
+            </div>
+            <div style="display:flex; justify-content:between; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                <span style="color:var(--text-secondary);">Transfer Fee</span>
+                <strong id="detail-fee" style="color:var(--danger);">£0.00</strong>
+            </div>
+            <div style="display:flex; justify-content:between; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                <span style="color:var(--text-secondary);">Reference Text</span>
+                <strong id="detail-msg">-</strong>
+            </div>
+            <div style="display:flex; justify-content:between; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                <span style="color:var(--text-secondary);">IP Address</span>
+                <strong id="detail-ip" style="font-family:'JetBrains Mono', monospace;">127.0.0.1</strong>
+            </div>
+        </div>
+    </div>
+    
+    <div>
+        <div style="display:flex; justify-content:between; font-size:16px; border-top:1px solid var(--border); padding-top:16px;">
+            <span style="color:var(--text-secondary); font-weight:600;">Amount</span>
+            <strong id="detail-amount" style="font-size:22px; font-weight:800; font-family:'JetBrains Mono', monospace;">£0.00</strong>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let transactionsData = [];
+
+function loadFilteredHistory() {
+    const accountId = document.getElementById("filter-acc").value;
+    const category = document.getElementById("filter-category").value;
+    const type = document.getElementById("filter-type").value;
+    const search = document.getElementById("filter-search").value;
+    
+    const box = document.getElementById("history-rows-box");
+    box.innerHTML = `<p style="text-align:center; padding:40px; color:var(--text-secondary);">Filtering histories...</p>`;
+    
+    let url = `/api/transactions?`;
+    if (accountId) url += `account_id=${accountId}&`;
+    if (category) url += `category=${category}&`;
+    if (type) url += `type=${type}&`;
+    if (search) url += `search=${encodeURIComponent(search)}&`;
+    
+    fetch(url)
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                transactionsData = res.data;
+                renderRows(res.data);
+            } else {
+                box.innerHTML = `<p style="text-align:center; padding:40px; color:var(--danger);">Failed to load transactions.</p>`;
+            }
+        });
+}
+
+function renderRows(txns) {
+    const box = document.getElementById("history-rows-box");
+    if (txns.length === 0) {
+        box.innerHTML = `<p style="text-align:center; padding:40px; color:var(--text-secondary);">No transactions match the selected filters.</p>`;
+        return;
+    }
+    
+    box.innerHTML = txns.map(t => {
+        const isCredit = t.transaction_type === "deposit" || (t.to_account_id && !t.from_account_id);
+        const sign = isCredit ? "+" : "-";
+        const color = isCredit ? "var(--accent-dark)" : "var(--text-primary)";
+        const dateStr = t.created_at.split("T")[0];
+        
+        return `
+            <div class="txn-row" style="display:flex; justify-content:between; align-items:center; padding:16px 24px; border-bottom:1px solid var(--border);" onclick="openDetailsSlide('${t.id}')">
+                <div>
+                    <h4 style="font-size:14px; font-weight:600; color:var(--text-primary);">${t.description}</h4>
+                    <span style="font-size:11px; color:var(--text-muted);">${dateStr} · Ref: ${t.transaction_ref}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="background:var(--surface); font-size:10px; font-weight:700; text-transform:uppercase; padding:4px 8px; border-radius:10px; color:var(--text-secondary);">${t.category}</span>
+                    <strong style="font-family:'JetBrains Mono', monospace; font-size:16px; color:${color};">${sign}£${t.amount.toFixed(2)}</strong>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+function openDetailsSlide(txnId) {
+    const t = transactionsData.find(txn => txn.id === txnId);
+    if (!t) return;
+    
+    const isCredit = t.transaction_type === "deposit" || (t.to_account_id && !t.from_account_id);
+    const sign = isCredit ? "+" : "-";
+    const color = isCredit ? "var(--accent-dark)" : "var(--text-primary)";
+    
+    document.getElementById("detail-desc").textContent = t.description;
+    document.getElementById("detail-date").textContent = t.created_at.split("T")[0];
+    document.getElementById("detail-ref").textContent = t.transaction_ref;
+    document.getElementById("detail-type").textContent = t.transaction_type.toUpperCase();
+    document.getElementById("detail-category").textContent = t.category;
+    document.getElementById("detail-method").textContent = t.transfer_method || "IMPS";
+    document.getElementById("detail-fee").textContent = t.fee ? "£" + parseFloat(t.fee).toFixed(2) : "£0.00";
+    document.getElementById("detail-msg").textContent = t.reference || "-";
+    document.getElementById("detail-ip").textContent = t.ip_address || "127.0.0.1";
+    document.getElementById("detail-amount").textContent = `${sign}£${t.amount.toFixed(2)}`;
+    document.getElementById("detail-amount").style.color = color;
+    
+    const panel = document.getElementById("details-slideover");
+    panel.style.display = "flex";
+    panel.className = "slide-over";
+}
+
+function closeDetailsSlide() {
+    const panel = document.getElementById("details-slideover");
+    panel.className = "slide-over closing";
+    panel.addEventListener("animationend", () => {
+        panel.style.display = "none";
+    }, { once: true });
+}
+
+// Debounce helper
+let timeout;
+function debounce(func, delay) {
+    return function() {
+        const context = this;
+        const args = arguments;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadFilteredHistory();
+    // Default close details panel if click outside
+    window.addEventListener("click", (e) => {
+        const panel = document.getElementById("details-slideover");
+        if (panel.style.display === "flex" && !panel.contains(e.target) && !e.target.closest(".txn-row")) {
+            closeDetailsSlide();
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay - My Bank Accounts{% endblock %}
+
+{% block content %}
+<div class="stagger" style="display:flex; flex-direction:column; gap:32px;">
+    <div style="display:flex; justify-content:between; align-items:center;">
+        <div>
+            <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">My Accounts</h2>
+            <p style="color:var(--text-secondary); font-size:14px;">Manage your Checking, Savings, and tax-free ISA balances.</p>
+        </div>
+        <button class="btn btn-primary" onclick="showCreateAccountModal()">Open New Account</button>
+    </div>
+
+    <!-- Accounts Cards Grid -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px;">
+        {% for acc in accounts %}
+        <div class="card" style="display:flex; flex-direction:column; justify-content:between; min-height:220px; border-left: 5px solid {% if acc.account_type == 'savings' %}var(--primary){% elif acc.account_type == 'isa' %}var(--accent){% else %}var(--primary-light){% endif %};">
+            <div>
+                <div style="display:flex; justify-content:between; align-items:start; margin-bottom:12px;">
+                    <div>
+                        <h3 style="font-size:18px; font-weight:700; color:var(--text-primary);">{{ acc.nickname or acc.account_type.upper() }}</h3>
+                        <span style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:600;">{{ acc.account_type }} account</span>
+                    </div>
+                    {% if acc.is_frozen %}
+                    <span style="background:var(--danger-light); color:var(--danger); font-size:11px; font-weight:700; padding:4px 8px; border-radius:12px;">FROZEN</span>
+                    {% endif %}
+                </div>
+                
+                <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--text-secondary); margin-bottom:20px;">
+                    <span>Sort Code: <strong>{{ acc.sort_code }}</strong></span> · 
+                    <span>Account No: <strong>{{ acc.account_number }}</strong></span>
+                </div>
+            </div>
+            
+            <div style="display:flex; justify-content:between; align-items:center; border-top:1px solid var(--border); padding-top:16px;">
+                <div>
+                    <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; display:block;">Current Balance</span>
+                    <strong class="balance-reveal" data-balance="{{ acc.balance }}" style="font-size:22px; font-weight:800; font-family:'JetBrains Mono', monospace;">£{{ acc.balance }}</strong>
+                </div>
+                
+                <a href="{{ url_for('accounts.detail_view', uuid_id=acc.id) }}" class="btn btn-secondary" style="padding:8px 14px; font-size:12px;">Manage →</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Create Account Modal -->
+<div id="create-account-modal" class="cmd-palette-backdrop" style="display:none; align-items:center;">
+    <div class="cmd-palette" style="padding:24px; max-width:400px; width:100%;">
+        <h3 style="margin-bottom:16px; font-size:18px; font-weight:700;">Open Savings / ISA Account</h3>
+        <form id="create-account-form" onsubmit="handleCreateAccount(event)">
+            <div class="form-group">
+                <label class="form-label" for="new-acc-type">Account Type</label>
+                <select id="new-acc-type" class="form-control">
+                    <option value="savings">Savings Account (Yielding interest)</option>
+                    <option value="isa">Cash ISA (Tax-Free Savings)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="new-acc-nickname">Account Nickname</label>
+                <input id="new-acc-nickname" class="form-control" type="text" placeholder="e.g. Holiday Fund" required>
+            </div>
+            <div style="display:flex; gap:12px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeCreateAccountModal()">Cancel</button>
+                <button type="submit" id="btn-create-acc-submit" class="btn btn-primary">Open Account</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showCreateAccountModal() {
+    document.getElementById("create-account-modal").style.display = "flex";
+}
+function closeCreateAccountModal() {
+    document.getElementById("create-account-modal").style.display = "none";
+}
+function handleCreateAccount(e) {
+    e.preventDefault();
+    const accountType = document.getElementById("new-acc-type").value;
+    const nickname = document.getElementById("new-acc-nickname").value;
+    const submitBtn = document.getElementById("btn-create-acc-submit");
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    
+    submitBtn.disabled = true;
+    
+    fetch("/api/accounts", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({ account_type: accountType, nickname })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast("New account opened successfully!", "accent");
+            if (typeof window.triggerConfetti === "function") {
+                window.triggerConfetti();
+            }
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showToast(res.error.message || "Failed to create account.", "error");
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(() => {
+        showToast("Network error.", "error");
+        submitBtn.disabled = false;
+    });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Animate balances
+    document.querySelectorAll(".balance-reveal").forEach(el => {
+        const val = parseFloat(el.dataset.balance || "0.00");
+        if (typeof window.animateCounter === "function") {
+            window.animateCounter(el, val, 800);
+        } else {
+            el.textContent = "£" + val.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+    });
+});
+</script>
+{% endblock %}

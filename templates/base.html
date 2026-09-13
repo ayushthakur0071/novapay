@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}NovaPay - Intelligent Multi-Cloud Banking{% endblock %}</title>
+    
+    <!-- CSS Layout System -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        {% if current_user.is_authenticated %}
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <!-- SVG logo -->
+                <svg viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#00C896" stroke-width="8" />
+                    <polygon points="40,35 68,50 40,65" fill="#00C896" />
+                </svg>
+                <h1>NovaPay</h1>
+            </div>
+            
+            <div class="user-snippet">
+                <div class="avatar-circle">
+                    <!-- Initials extraction -->
+                    {{ current_user.full_name[:2].upper() }}
+                </div>
+                <div class="user-info">
+                    <h2>{{ current_user.full_name }}</h2>
+                    <p>ID: {{ current_user.id[:8] }}...</p>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <li class="nav-item {% if request.blueprint == 'dashboard' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard.index') }}" class="nav-link">
+                        Dashboard
+                    </a>
+                </li>
+                <li class="nav-item {% if request.blueprint == 'accounts' %}active{% endif %}">
+                    <a href="{{ url_for('accounts.list_view') }}" class="nav-link">
+                        Accounts
+                    </a>
+                </li>
+                <li class="nav-item {% if request.path.startswith('/transactions') %}active{% endif %}">
+                    <a href="{{ url_for('transactions.transfer') }}" class="nav-link">
+                        Transfer Funds
+                    </a>
+                </li>
+                <li class="nav-item {% if request.blueprint == 'beneficiaries' %}active{% endif %}">
+                    <a href="{{ url_for('beneficiaries.index') }}" class="nav-link">
+                        Beneficiaries
+                    </a>
+                </li>
+                <li class="nav-item {% if request.blueprint == 'cards' %}active{% endif %}">
+                    <a href="{{ url_for('cards.index') }}" class="nav-link">
+                        My Cards
+                    </a>
+                </li>
+                <li class="nav-item {% if request.blueprint == 'standing_orders' %}active{% endif %}">
+                    <a href="{{ url_for('standing_orders.index') }}" class="nav-link">
+                        Standing Orders
+                    </a>
+                </li>
+                <li class="nav-item {% if request.blueprint == 'statements' %}active{% endif %}">
+                    <a href="{{ url_for('statements.index') }}" class="nav-link">
+                        Statements
+                    </a>
+                </li>
+                <li class="nav-item {% if request.blueprint == 'notifications' %}active{% endif %}">
+                    <a href="{{ url_for('notifications.index') }}" class="nav-link">
+                        Notifications
+                    </a>
+                </li>
+                <li class="nav-item {% if request.blueprint == 'support' %}active{% endif %}">
+                    <a href="{{ url_for('support.index') }}" class="nav-link">
+                        Support Tickets
+                    </a>
+                </li>
+                <li class="nav-item {% if request.blueprint == 'profile' and request.path == '/profile' %}active{% endif %}">
+                    <a href="{{ url_for('profile.index') }}" class="nav-link">
+                        My Profile
+                    </a>
+                </li>
+                <li class="nav-item {% if request.path == '/settings' %}active{% endif %}">
+                    <a href="{{ url_for('profile.settings') }}" class="nav-link">
+                        Settings
+                    </a>
+                </li>
+                
+                {% if current_user.is_admin %}
+                <li class="nav-item" style="margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+                    <a href="{{ url_for('admin.dashboard') }}" class="nav-link" style="color:var(--danger);">
+                        Admin Panel
+                    </a>
+                </li>
+                {% endif %}
+                
+                <li class="nav-item" style="margin-top:auto;">
+                    <a href="{{ url_for('auth.logout') }}" class="nav-link">
+                        Sign Out
+                    </a>
+                </li>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span id="server-status-dot" class="status-dot green"></span>
+                    <span id="server-status-text">AWS Active</span>
+                </div>
+            </div>
+        </aside>
+        {% endif %}
+
+        <!-- Main Workspace -->
+        <main class="main-wrapper {% if not current_user.is_authenticated %}full-width{% endif %}">
+            {% if current_user.is_authenticated %}
+            <header class="top-navbar">
+                <div class="top-nav-left">
+                    <!-- Mobile hamburger -->
+                    <button id="hamburger-btn" style="background:none; border:none; display:none; cursor:pointer; color:var(--text-primary);">
+                        <svg style="width:24px; height:24px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+
+                    <button type="button" class="app-back-button" data-back-button data-fallback-url="{{ url_for('dashboard.index') }}" aria-label="Go back to previous page">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M15 18l-6-6 6-6" />
+                        </svg>
+                        <span>Back</span>
+                    </button>
+
+                    <!-- Search palette trigger -->
+                    <div id="cmd-trigger" class="search-trigger">
+                        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                        <span>Search transactions, help...</span>
+                        <kbd>Ctrl+K</kbd>
+                    </div>
+                </div>
+
+                <div class="nav-actions">
+                    <!-- Notification dropdown trigger -->
+                    <div class="notif-bell-container">
+                        <button class="notif-bell" onclick="window.location.href='/notifications'">
+                            <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+                            <span class="notif-badge" style="display:none;">0</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Quick send payment CTA -->
+                    <a href="{{ url_for('transactions.transfer') }}" class="btn btn-accent">
+                        Quick Send
+                    </a>
+                </div>
+            </header>
+            {% endif %}
+
+            {% if not current_user.is_authenticated %}
+            <button type="button" class="app-back-button app-back-button-floating" data-back-button data-fallback-url="{{ url_for('auth.login') }}" aria-label="Go back to previous page">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M15 18l-6-6 6-6" />
+                </svg>
+                <span>Back</span>
+            </button>
+            {% endif %}
+
+            <!-- Page templates slot -->
+            <div class="{% if current_user.is_authenticated %}container page-enter{% endif %}">
+                {% block content %}{% endblock %}
+            </div>
+            
+            {% if current_user.is_authenticated %}
+            <!-- Mobile Bottom Tab Bar -->
+            <div class="mobile-navbar">
+                <a href="/dashboard" class="mobile-tab {% if request.blueprint == 'dashboard' %}active{% endif %}">
+                    <span>Home</span>
+                </a>
+                <a href="/accounts" class="mobile-tab {% if request.blueprint == 'accounts' %}active{% endif %}">
+                    <span>Accounts</span>
+                </a>
+                <a href="/transactions/transfer" class="mobile-tab">
+                    <span>Send</span>
+                </a>
+                <a href="/cards" class="mobile-tab">
+                    <span>Cards</span>
+                </a>
+                <a href="/notifications" class="mobile-tab">
+                    <span>Alerts</span>
+                </a>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <!-- Global Command Palette Modal -->
+    <div id="cmd-palette-backdrop" class="cmd-palette-backdrop" style="display:none;">
+        <div class="cmd-palette">
+            <div class="cmd-input-container">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                <input id="cmd-search-input" class="cmd-input" type="text" placeholder="Search accounts, beneficiaries, routes..." autocomplete="off">
+            </div>
+            <div id="cmd-results" class="cmd-results"></div>
+        </div>
+    </div>
+
+    {% block modals %}{% endblock %}
+
+    <!-- UI system scripts -->
+    <script src="{{ url_for('static', filename='js/back-navigation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/monitoring.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
