@@ -75,7 +75,7 @@ function handleMFAVerify(e) {
         if (res.success) {
             showToast("Identity verified! Redirecting...", "accent");
             setTimeout(() => {
-                window.location.href = "{{ url_for('dashboard.index') }}";
+                window.location.href = res.redirect_url || "{{ url_for('dashboard.index') }}";
             }, 1000);
         } else {
             showToast(res.error.message || "Invalid 2FA code.", "error");

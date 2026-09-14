@@ -15,16 +15,25 @@ from models import User
 
 auth_bp = Blueprint("auth", __name__)
 
+
+def _post_login_url(user=None):
+    """Returns the right landing page for the signed-in role."""
+    role_user = user or current_user
+    if getattr(role_user, "is_admin", False):
+        return url_for("admin.dashboard")
+    return url_for("dashboard.index")
+
+
 @auth_bp.route("/login", methods=["GET"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+        return redirect(_post_login_url())
     return render_template("auth/login.html")
 
 @auth_bp.route("/register", methods=["GET"])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+        return redirect(_post_login_url())
     return render_template("auth/register.html")
 
 @auth_bp.route("/logout", methods=["GET", "POST"])
@@ -288,7 +297,12 @@ def api_login():
         if user.mfa_enabled:
             session['pending_mfa_user_id'] = str(user.id)
             session['pending_mfa_remember'] = remember
-            return jsonify({"success": True, "mfa_required": True})
+            return jsonify({
+                "success": True,
+                "mfa_required": True,
+                "is_admin": user.is_admin,
+                "redirect_url": _post_login_url(user)
+            })
             
         login_user(user, remember=remember)
         
@@ -300,7 +314,18 @@ def api_login():
         except Exception as ex:
             print(f"Failed to dispatch login alert: {ex}")
             
-        return jsonify({"success": True, "mfa_required": False, "data": {"user_id": user.id, "email": user.email, "full_name": user.full_name}})
+        return jsonify({
+            "success": True,
+            "mfa_required": False,
+            "is_admin": user.is_admin,
+            "redirect_url": _post_login_url(user),
+            "data": {
+                "user_id": user.id,
+                "email": user.email,
+                "full_name": user.full_name,
+                "is_admin": user.is_admin
+            }
+        })
         
     except Exception as e:
         print(f"Login failed: {e}")
@@ -339,7 +364,7 @@ def api_check_email():
 @auth_bp.route("/mfa-verify", methods=["GET"])
 def mfa_verify_page():
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+        return redirect(_post_login_url())
     if not session.get('pending_mfa_user_id'):
         return redirect(url_for("auth.login"))
     return render_template("auth/mfa_verify.html")
@@ -449,7 +474,17 @@ def api_mfa_verify():
         except Exception as ex:
             print(f"Failed to dispatch login alert: {ex}")
             
-        return jsonify({"success": True, "data": {"user_id": user.id, "email": user.email, "full_name": user.full_name}})
+        return jsonify({
+            "success": True,
+            "is_admin": user.is_admin,
+            "redirect_url": _post_login_url(user),
+            "data": {
+                "user_id": user.id,
+                "email": user.email,
+                "full_name": user.full_name,
+                "is_admin": user.is_admin
+            }
+        })
         
     except Exception as e:
         print(f"MFA verification failed: {e}")

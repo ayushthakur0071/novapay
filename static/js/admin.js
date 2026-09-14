@@ -3,16 +3,22 @@
  */
 
 let adminUsersList = [];
+let adminAccountsList = [];
+let adminTransactionsList = [];
 let selectedAdminUser = null;
 let adminLogRows = [];
 let adminLogPaused = false;
 let adminDashboardTimer = null;
 let adminMonitoringTimer = null;
 let adminLogTimer = null;
+let adminUserModalInitialised = false;
 
 document.addEventListener("DOMContentLoaded", () => {
+    initUserAuditModal();
     initAdminDashboard();
+    initAdminAccountsPage();
     initAdminUsersPage();
+    initAdminTransactionsPage();
     initAdminMonitoringPage();
     initManualFailover();
     initLogStreamer();
@@ -73,6 +79,29 @@ function formatDate(value) {
     }).format(date);
 }
 
+function formatDateTime(value) {
+    if (!value) return "Not recorded";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Not recorded";
+    return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    }).format(date);
+}
+
+function formatMonth(value) {
+    if (!value) return "Current month";
+    const date = new Date(`${value}-01T00:00:00`);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat("en-GB", {
+        month: "long",
+        year: "numeric"
+    }).format(date);
+}
+
 function formatTime(value) {
     if (!value) return "00:00:00";
     const date = new Date(value);
@@ -92,6 +121,11 @@ function getInitials(name) {
 function setText(id, value) {
     const element = document.getElementById(id);
     if (element) element.textContent = value;
+}
+
+function setHtml(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.innerHTML = value;
 }
 
 function setProgress(id, value) {
@@ -156,6 +190,23 @@ function kycLabel(status) {
     return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
+function accountStatus(account) {
+    if (Number(account?.balance || 0) < 0) return { label: "Overdrawn", className: "declined", filter: "overdrawn" };
+    if (account?.is_frozen === true) return { label: "Frozen", className: "pending", filter: "frozen" };
+    if (account?.is_active === false) return { label: "Inactive", className: "locked", filter: "inactive" };
+    return { label: "Live", className: "active", filter: "live" };
+}
+
+function normalise(value, fallback = "") {
+    return String(value ?? fallback).trim().toLowerCase();
+}
+
+function percentage(part, whole) {
+    const denominator = Number(whole) || 0;
+    if (denominator <= 0) return 0;
+    return clamp((Number(part) / denominator) * 100);
+}
+
 function initAdminDashboard() {
     const statsContainer = document.getElementById("admin-stats-box");
     if (!statsContainer) return;
@@ -205,6 +256,7 @@ async function refreshAdminStats() {
     setText("stat-aum-note", "Assets under custody");
     setText("stat-txns-note", "Completed ledger events");
     setText("stat-volume-note", "Settled payment volume");
+    setText("admin-action-accounts", `${formatNumber(data.total_users || 0)} customers`);
     setText("admin-action-ledger", `${formatNumber(data.transaction_count || 0)} txns`);
 
     setProgress("stat-users-progress", (Number(data.total_users) / 30) * 100);
@@ -354,6 +406,183 @@ function updateNodeTelemetry(node, data) {
     if (note) note.textContent = `Latest samples: ${label} ${status} at ${latency.toFixed(0)}ms.`;
 }
 
+function initAdminAccountsPage() {
+    const tbody = document.getElementById("admin-accounts-tbody");
+    if (!tbody) return;
+
+    const searchInput = document.getElementById("admin-account-search");
+    const typeFilter = document.getElementById("admin-account-type-filter");
+    const statusFilter = document.getElementById("admin-account-status-filter");
+    const refreshButton = document.getElementById("admin-accounts-refresh");
+    const render = () => renderAccountsTable(filterAccounts());
+
+    searchInput?.addEventListener("input", render);
+    typeFilter?.addEventListener("change", render);
+    statusFilter?.addEventListener("change", render);
+    refreshButton?.addEventListener("click", () => loadAdminAccounts(true));
+
+    document.querySelectorAll("[data-account-preset]").forEach(card => {
+        card.addEventListener("click", () => {
+            const preset = card.dataset.accountPreset;
+            if (searchInput) searchInput.value = "";
+            if (typeFilter) typeFilter.value = "all";
+            if (statusFilter) {
+                statusFilter.value = preset === "restricted" ? "restricted" : preset === "overdrawn" ? "overdrawn" : preset === "live" ? "live" : "all";
+            }
+            document.querySelectorAll("[data-account-preset]").forEach(item => item.classList.remove("active"));
+            card.classList.add("active");
+            render();
+        });
+    });
+
+    loadAdminAccounts();
+}
+
+async function loadAdminAccounts(manual = false) {
+    const tbody = document.getElementById("admin-accounts-tbody");
+    const refreshButton = document.getElementById("admin-accounts-refresh");
+    if (tbody && !adminAccountsList.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="admin-empty-cell">Fetching account directory...</td></tr>`;
+    }
+
+    setButtonLoading(refreshButton, manual, "Refreshing...");
+    try {
+        const response = await requestJson("/api/admin/accounts");
+        adminAccountsList = response.data || [];
+        renderAccountsSummary();
+        renderAccountsTable(filterAccounts());
+        if (manual) adminNotify("Account directory refreshed.", "accent");
+    } catch (error) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="admin-empty-cell">${escapeHtml(error.message)}</td></tr>`;
+    } finally {
+        setButtonLoading(refreshButton, false);
+    }
+}
+
+function renderAccountsSummary() {
+    const total = adminAccountsList.length;
+    const live = adminAccountsList.filter(account => accountStatus(account).filter === "live").length;
+    const restricted = adminAccountsList.filter(account => ["frozen", "inactive"].includes(accountStatus(account).filter)).length;
+    const overdrawn = adminAccountsList.filter(account => accountStatus(account).filter === "overdrawn").length;
+    const totalBalance = adminAccountsList.reduce((sum, account) => sum + Number(account.balance || 0), 0);
+
+    setText("accounts-total-count", total);
+    setText("accounts-live-count", live);
+    setText("accounts-restricted-count", restricted);
+    setText("accounts-overdrawn-count", overdrawn);
+    setText("admin-account-balance-chip", `${formatCurrency(totalBalance)} total`);
+}
+
+function filterAccounts() {
+    const query = normalise(document.getElementById("admin-account-search")?.value);
+    const type = normalise(document.getElementById("admin-account-type-filter")?.value, "all");
+    const status = normalise(document.getElementById("admin-account-status-filter")?.value, "all");
+
+    return adminAccountsList.filter(account => {
+        const statusMeta = accountStatus(account);
+        const haystack = [
+            account.id,
+            account.user_id,
+            account.user_full_name,
+            account.user_email,
+            account.user_phone,
+            account.account_number,
+            account.sort_code,
+            account.nickname,
+            account.account_type
+        ].join(" ").toLowerCase();
+
+        const typeMatch = type === "all" || normalise(account.account_type) === type;
+        const statusMatch = status === "all"
+            || statusMeta.filter === status
+            || (status === "restricted" && ["frozen", "inactive"].includes(statusMeta.filter));
+        const queryMatch = !query || haystack.includes(query);
+        return typeMatch && statusMatch && queryMatch;
+    });
+}
+
+function renderAccountsTable(accounts) {
+    const tbody = document.getElementById("admin-accounts-tbody");
+    const resultCount = document.getElementById("admin-account-result-count");
+    if (!tbody) return;
+
+    if (resultCount) {
+        resultCount.textContent = `${accounts.length} of ${adminAccountsList.length} accounts shown`;
+    }
+
+    const visibleBalance = accounts.reduce((sum, account) => sum + Number(account.balance || 0), 0);
+    setText("admin-account-balance-chip", `${formatCurrency(visibleBalance)} visible`);
+
+    if (!accounts.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="admin-empty-cell">No accounts match the current filters.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = accounts.map(account => {
+        const status = accountStatus(account);
+        const owner = account.user_full_name || "Unknown customer";
+        return `
+            <tr>
+                <td>
+                    <button type="button" class="admin-user-identity" data-view-user="${escapeHtml(account.user_id)}">
+                        <span class="admin-user-avatar">${escapeHtml(getInitials(owner).toUpperCase())}</span>
+                        <span>
+                            <strong>${escapeHtml(owner)}</strong>
+                            <small>${escapeHtml(account.user_email || "No email")}</small>
+                        </span>
+                    </button>
+                </td>
+                <td>
+                    <strong class="mono-code">${escapeHtml(account.account_number || "No number")}</strong>
+                    <small class="admin-table-subtext">${escapeHtml(account.sort_code || "No sort code")} · ${escapeHtml(account.nickname || "No nickname")}</small>
+                </td>
+                <td><span class="admin-status-badge">${escapeHtml(account.account_type || "Account")}</span></td>
+                <td><strong class="mono-code">${escapeHtml(formatCurrency(account.balance))}</strong></td>
+                <td><span class="mono-code">${escapeHtml(formatCurrency(account.available_balance))}</span></td>
+                <td>
+                    <strong>${escapeHtml(formatNumber(account.transaction_count || 0))}</strong>
+                    <small class="admin-table-subtext">${escapeHtml(formatDate(account.last_transaction_at))}</small>
+                </td>
+                <td><span class="admin-status-badge ${status.className}">${escapeHtml(status.label)}</span></td>
+                <td class="admin-table-actions">
+                    <div class="admin-row-actions">
+                        <button type="button" class="btn btn-secondary" data-view-user="${escapeHtml(account.user_id)}">View Profile</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+    tbody.querySelectorAll("[data-view-user]").forEach(button => {
+        button.addEventListener("click", () => viewUserDetail(button.dataset.viewUser));
+    });
+}
+
+function initUserAuditModal() {
+    const modal = document.getElementById("user-detail-modal");
+    if (!modal || adminUserModalInitialised) return;
+    adminUserModalInitialised = true;
+
+    document.getElementById("close-user-detail-modal")?.addEventListener("click", closeUserDetailModal);
+    document.getElementById("btn-modal-close-secondary")?.addEventListener("click", closeUserDetailModal);
+    modal?.addEventListener("click", event => {
+        if (event.target === modal) closeUserDetailModal();
+    });
+
+    document.getElementById("btn-modal-freeze")?.addEventListener("click", toggleFreezeFromModal);
+    document.querySelectorAll("[data-kyc-status]").forEach(button => {
+        button.addEventListener("click", () => verifyKYCFromModal(button.dataset.kycStatus));
+    });
+
+    document.querySelectorAll("[data-user-modal-tab]").forEach(button => {
+        button.addEventListener("click", () => setActiveUserModalTab(button.dataset.userModalTab));
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && modal?.style.display === "flex") closeUserDetailModal();
+    });
+}
+
 function initAdminUsersPage() {
     const tbody = document.getElementById("admin-users-tbody");
     if (!tbody) return;
@@ -362,7 +591,6 @@ function initAdminUsersPage() {
     const kycFilter = document.getElementById("admin-kyc-filter");
     const statusFilter = document.getElementById("admin-status-filter");
     const refreshButton = document.getElementById("admin-users-refresh");
-    const modal = document.getElementById("user-detail-modal");
 
     const render = () => renderUsersTable(filterUsers());
 
@@ -383,21 +611,6 @@ function initAdminUsersPage() {
         });
     });
 
-    document.getElementById("close-user-detail-modal")?.addEventListener("click", closeUserDetailModal);
-    document.getElementById("btn-modal-close-secondary")?.addEventListener("click", closeUserDetailModal);
-    modal?.addEventListener("click", event => {
-        if (event.target === modal) closeUserDetailModal();
-    });
-
-    document.getElementById("btn-modal-freeze")?.addEventListener("click", toggleFreezeFromModal);
-    document.querySelectorAll("[data-kyc-status]").forEach(button => {
-        button.addEventListener("click", () => verifyKYCFromModal(button.dataset.kycStatus));
-    });
-
-    document.addEventListener("keydown", event => {
-        if (event.key === "Escape" && modal?.style.display === "flex") closeUserDetailModal();
-    });
-
     loadAdminUsers();
 }
 
@@ -405,7 +618,7 @@ async function loadAdminUsers(manual = false) {
     const tbody = document.getElementById("admin-users-tbody");
     const refreshButton = document.getElementById("admin-users-refresh");
     if (tbody && !adminUsersList.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="admin-empty-cell">Fetching customer directory...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="admin-empty-cell">Fetching customer directory...</td></tr>`;
     }
 
     setButtonLoading(refreshButton, manual, "Refreshing...");
@@ -417,7 +630,7 @@ async function loadAdminUsers(manual = false) {
         await openUserFromQuery();
         if (manual) adminNotify("User directory refreshed.", "accent");
     } catch (error) {
-        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="admin-empty-cell">${escapeHtml(error.message)}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="admin-empty-cell">${escapeHtml(error.message)}</td></tr>`;
     } finally {
         setButtonLoading(refreshButton, false);
     }
@@ -466,7 +679,7 @@ function renderUsersTable(users) {
     }
 
     if (!users.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="admin-empty-cell">No customers match the current filters.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="admin-empty-cell">No customers match the current filters.</td></tr>`;
         return;
     }
 
@@ -486,6 +699,11 @@ function renderUsersTable(users) {
                 </td>
                 <td>${escapeHtml(user.email || "No email")}</td>
                 <td><span class="mono-code">${escapeHtml(user.phone || "Not set")}</span></td>
+                <td>
+                    <strong>${escapeHtml(formatNumber(user.account_count || 0))}</strong>
+                    <small class="admin-table-subtext">products</small>
+                </td>
+                <td><strong class="mono-code">${escapeHtml(formatCurrency(user.total_balance))}</strong></td>
                 <td><span class="admin-status-badge ${kyc}">${escapeHtml(kycLabel(kyc))}</span></td>
                 <td><span class="admin-status-badge ${isLocked ? "locked" : "active"}">${isLocked ? "Locked" : "Active"}</span></td>
                 <td><span class="admin-table-subtext">${escapeHtml(formatDate(user.created_at))}</span></td>
@@ -522,6 +740,18 @@ async function viewUserDetail(id) {
     }
 }
 
+function setActiveUserModalTab(tabName = "overview") {
+    document.querySelectorAll("[data-user-modal-tab]").forEach(button => {
+        const active = button.dataset.userModalTab === tabName;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+
+    document.querySelectorAll("[data-user-panel]").forEach(panel => {
+        panel.classList.toggle("active", panel.dataset.userPanel === tabName);
+    });
+}
+
 function showUserModalLoading(id) {
     const modal = document.getElementById("user-detail-modal");
     if (!modal) return;
@@ -534,15 +764,36 @@ function showUserModalLoading(id) {
     setText("det-user-id", `ID ${id}`);
     setText("det-total-balance", formatCurrency(0));
     setText("det-account-count", "0");
+    setText("det-available-balance", formatCurrency(0));
+    setText("det-monthly-spending", formatCurrency(0));
+    setText("det-monthly-income", formatCurrency(0));
+    setText("det-ledger-count", "0");
+    setText("det-overdraft", formatCurrency(0));
+    setText("det-modal-month", "Current month");
     setText("det-product-status", "0 accounts");
     setText("det-fullname", "-");
     setText("det-email", "-");
     setText("det-phone", "-");
     setText("det-address", "-");
+    setText("det-dob", "-");
+    setText("det-country", "-");
     setText("det-created", "-");
+    setText("det-last-login", "-");
+    setText("det-verified", "Loading");
+    setText("det-mfa", "Loading");
     setText("det-kyc", "LOADING");
     setText("det-active", "Loading");
-    document.getElementById("det-accounts-box").innerHTML = `<div class="admin-detail-empty">Loading linked products...</div>`;
+    setHtml("det-accounts-box", `<div class="admin-detail-empty">Loading linked products...</div>`);
+    setHtml("det-spending-box", `<div class="admin-detail-empty">Loading spending categories...</div>`);
+    setHtml("det-budgets-box", `<div class="admin-detail-empty">Loading budgets...</div>`);
+    setHtml("det-goals-box", `<div class="admin-detail-empty">Loading goals...</div>`);
+    setHtml("det-cards-box", `<div class="admin-detail-empty">Loading cards...</div>`);
+    setHtml("det-standing-orders-box", `<div class="admin-detail-empty">Loading scheduled payments...</div>`);
+    setHtml("det-support-box", `<div class="admin-detail-empty">Loading support tickets...</div>`);
+    setHtml("det-notifications-box", `<div class="admin-detail-empty">Loading notifications...</div>`);
+    setHtml("det-audit-box", `<div class="admin-detail-empty">Loading audit log...</div>`);
+    setHtml("det-transactions-body", `<tr><td colspan="6">Loading transactions...</td></tr>`);
+    setActiveUserModalTab("overview");
     setModalActionsDisabled(true);
     window.setTimeout(() => document.getElementById("close-user-detail-modal")?.focus(), 30);
 }
@@ -550,7 +801,8 @@ function showUserModalLoading(id) {
 function renderUserDetail(data) {
     const user = data.user || {};
     const accounts = data.accounts || [];
-    const balanceTotal = accounts.reduce((sum, account) => sum + Number(account.balance || 0), 0);
+    const summary = data.summary || {};
+    const balanceTotal = Number(summary.total_balance ?? accounts.reduce((sum, account) => sum + Number(account.balance || 0), 0));
     const address = [user.address, user.city, user.postcode].filter(Boolean).join(", ") || "Not recorded";
     const kyc = kycClass(user.kyc_status);
     const isLocked = user.is_active === false;
@@ -559,13 +811,24 @@ function renderUserDetail(data) {
     setText("admin-user-modal-title", user.full_name || "Customer profile");
     setText("det-user-id", `ID ${String(user.id || "").slice(0, 12)}...`);
     setText("det-total-balance", formatCurrency(balanceTotal));
-    setText("det-account-count", accounts.length);
+    setText("det-account-count", summary.account_count ?? accounts.length);
+    setText("det-available-balance", formatCurrency(summary.total_available_balance));
+    setText("det-monthly-spending", formatCurrency(summary.monthly_spending));
+    setText("det-monthly-income", formatCurrency(summary.monthly_income));
+    setText("det-ledger-count", formatNumber(summary.transaction_count || 0));
+    setText("det-overdraft", formatCurrency(summary.total_overdraft_limit));
+    setText("det-modal-month", formatMonth(summary.current_month));
     setText("det-product-status", `${accounts.length} account${accounts.length === 1 ? "" : "s"}`);
     setText("det-fullname", user.full_name || "Not recorded");
     setText("det-email", user.email || "Not recorded");
     setText("det-phone", user.phone || "Not recorded");
     setText("det-address", address);
+    setText("det-dob", formatDate(user.date_of_birth));
+    setText("det-country", user.country || "Not recorded");
     setText("det-created", formatDate(user.created_at));
+    setText("det-last-login", formatDateTime(user.last_login));
+    setText("det-verified", user.is_verified ? "Verified" : "Not verified");
+    setText("det-mfa", user.mfa_enabled ? "Enabled" : "Not enabled");
     setText("det-kyc", kycLabel(kyc));
     setText("det-active", isLocked ? "Locked" : "Active");
 
@@ -579,6 +842,15 @@ function renderUserDetail(data) {
 
     renderUserDocument(user);
     renderUserAccounts(accounts);
+    renderUserSpending(data.spending_by_category || [], summary.monthly_spending || 0);
+    renderUserBudgets(data.budgets || [], data.spending_by_category || []);
+    renderUserGoals(data.savings_goals || []);
+    renderUserTransactions(data.recent_transactions || []);
+    renderUserCards(data.cards || []);
+    renderUserStandingOrders(data.standing_orders || []);
+    renderUserSupport(data.support_tickets || []);
+    renderUserNotifications(data.notifications || []);
+    renderUserAuditLog(data.audit_logs || []);
     setModalActionsDisabled(false);
 }
 
@@ -611,21 +883,188 @@ function renderUserAccounts(accounts) {
     }
 
     accountBox.innerHTML = accounts.map(account => {
-        const frozen = account.is_frozen === true;
-        const inactive = account.is_active === false;
-        const status = frozen ? "Frozen" : inactive ? "Inactive" : "Live";
-        const statusClass = frozen ? "pending" : inactive ? "locked" : "active";
+        const status = accountStatus(account);
         return `
             <div class="admin-account-row">
                 <span>
                     <strong>${escapeHtml(account.nickname || account.account_type || "Account")}</strong>
                     <small>${escapeHtml(account.account_number || "No account number")} · ${escapeHtml(account.sort_code || "No sort code")}</small>
                 </span>
+                <div class="admin-account-metrics">
+                    <span>${escapeHtml(formatNumber(account.transaction_count || 0))} txns</span>
+                    <small>In ${escapeHtml(formatCurrency(account.incoming_total))} · Out ${escapeHtml(formatCurrency(account.outgoing_total))}</small>
+                </div>
                 <strong class="amount">${escapeHtml(formatCurrency(account.balance))}</strong>
-                <span class="admin-status-badge ${statusClass}">${escapeHtml(status)}</span>
+                <span class="admin-status-badge ${status.className}">${escapeHtml(status.label)}</span>
             </div>
         `;
     }).join("");
+}
+
+function renderBreakdownList(id, rows, emptyMessage, rowRenderer) {
+    const box = document.getElementById(id);
+    if (!box) return;
+
+    if (!rows.length) {
+        box.innerHTML = `<div class="admin-detail-empty">${escapeHtml(emptyMessage)}</div>`;
+        return;
+    }
+
+    box.innerHTML = rows.map(rowRenderer).join("");
+}
+
+function renderUserSpending(rows, total) {
+    renderBreakdownList("det-spending-box", rows, "No spending recorded this month.", row => {
+        const width = percentage(row.total, total);
+        return `
+            <div class="admin-breakdown-row">
+                <span>
+                    <strong>${escapeHtml(row.category || "other")}</strong>
+                    <small>${escapeHtml(formatNumber(row.transaction_count || 0))} transactions</small>
+                </span>
+                <strong>${escapeHtml(formatCurrency(row.total))}</strong>
+                <span class="admin-meter"><i style="width:${width}%"></i></span>
+            </div>
+        `;
+    });
+}
+
+function renderUserBudgets(rows, spendingRows) {
+    const spendByCategory = new Map(spendingRows.map(row => [normalise(row.category, "other"), Number(row.total || 0)]));
+    renderBreakdownList("det-budgets-box", rows, "No budgets set for this month.", row => {
+        const spent = spendByCategory.get(normalise(row.category, "other")) || 0;
+        const limit = Number(row.limit_amount || 0);
+        const width = percentage(spent, limit);
+        return `
+            <div class="admin-breakdown-row">
+                <span>
+                    <strong>${escapeHtml(row.category || "other")}</strong>
+                    <small>${escapeHtml(formatCurrency(spent))} of ${escapeHtml(formatCurrency(limit))}</small>
+                </span>
+                <strong>${Math.round(width)}%</strong>
+                <span class="admin-meter"><i style="width:${width}%"></i></span>
+            </div>
+        `;
+    });
+}
+
+function renderUserGoals(rows) {
+    renderBreakdownList("det-goals-box", rows, "No savings goals are attached to this customer.", row => {
+        const current = Number(row.current_amount || 0);
+        const target = Number(row.target_amount || 0);
+        const width = percentage(current, target);
+        return `
+            <div class="admin-breakdown-row">
+                <span>
+                    <strong>${escapeHtml(row.name || "Savings goal")}</strong>
+                    <small>${escapeHtml(row.account_nickname || row.account_number || "Linked account")} · Target ${escapeHtml(formatDate(row.target_date))}</small>
+                </span>
+                <strong>${escapeHtml(formatCurrency(current))}</strong>
+                <span class="admin-meter"><i style="width:${width}%"></i></span>
+            </div>
+        `;
+    });
+}
+
+function renderUserTransactions(rows) {
+    const tbody = document.getElementById("det-transactions-body");
+    if (!tbody) return;
+
+    if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="6">No transactions recorded for this customer.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = rows.map(txn => {
+        const directionClass = txn.direction === "credit" ? "active" : txn.direction === "internal" ? "pending" : "declined";
+        const amount = `${txn.display_prefix || ""}${formatCurrency(txn.display_amount ?? txn.amount)}`;
+        return `
+            <tr>
+                <td>${escapeHtml(formatDate(txn.created_at))}</td>
+                <td><span class="mono-code">${escapeHtml(txn.transaction_ref || "No ref")}</span></td>
+                <td>${escapeHtml(txn.counterparty || "Not recorded")}</td>
+                <td><span class="admin-status-badge">${escapeHtml(txn.category || "other")}</span></td>
+                <td><strong class="mono-code">${escapeHtml(amount)}</strong></td>
+                <td><span class="admin-status-badge ${directionClass}">${escapeHtml(txn.status || txn.direction || "unknown")}</span></td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function renderUserCards(rows) {
+    renderBreakdownList("det-cards-box", rows, "No cards are attached to this customer.", card => {
+        const status = card.is_frozen ? "Frozen" : card.is_active === false ? "Inactive" : "Active";
+        const statusClass = card.is_frozen ? "pending" : card.is_active === false ? "locked" : "active";
+        return `
+            <div class="admin-breakdown-row compact">
+                <span>
+                    <strong>${escapeHtml(card.masked_number || "Card")}</strong>
+                    <small>${escapeHtml(card.card_network || "Network")} ${escapeHtml(card.card_type || "card")} · ${escapeHtml(card.account_nickname || card.account_number || "Linked account")}</small>
+                </span>
+                <span class="admin-status-badge ${statusClass}">${escapeHtml(status)}</span>
+            </div>
+        `;
+    });
+}
+
+function renderUserStandingOrders(rows) {
+    renderBreakdownList("det-standing-orders-box", rows, "No scheduled payments are active.", order => {
+        const statusClass = order.is_active === false ? "locked" : "active";
+        return `
+            <div class="admin-breakdown-row compact">
+                <span>
+                    <strong>${escapeHtml(order.beneficiary_name || order.beneficiary_nickname || "Beneficiary")}</strong>
+                    <small>${escapeHtml(order.frequency || "Schedule")} · Next ${escapeHtml(formatDate(order.next_payment))}</small>
+                </span>
+                <strong>${escapeHtml(formatCurrency(order.amount))}</strong>
+                <span class="admin-status-badge ${statusClass}">${order.is_active === false ? "Inactive" : "Active"}</span>
+            </div>
+        `;
+    });
+}
+
+function renderUserSupport(rows) {
+    renderBreakdownList("det-support-box", rows, "No support tickets for this customer.", ticket => `
+        <div class="admin-breakdown-row compact">
+            <span>
+                <strong>${escapeHtml(ticket.subject || ticket.ticket_ref || "Support ticket")}</strong>
+                <small>${escapeHtml(ticket.ticket_ref || "No ref")} · ${escapeHtml(formatDate(ticket.updated_at || ticket.created_at))}</small>
+            </span>
+            <span class="admin-status-badge ${normalise(ticket.status) === "open" ? "pending" : "active"}">${escapeHtml(ticket.status || "open")}</span>
+        </div>
+    `);
+}
+
+function renderUserNotifications(rows) {
+    renderBreakdownList("det-notifications-box", rows, "No recent notifications for this customer.", notif => `
+        <div class="admin-breakdown-row compact">
+            <span>
+                <strong>${escapeHtml(notif.title || "Notification")}</strong>
+                <small>${escapeHtml(notif.message || "No message")}</small>
+            </span>
+            <span class="admin-status-badge ${notif.is_read ? "active" : "pending"}">${notif.is_read ? "Read" : "Unread"}</span>
+        </div>
+    `);
+}
+
+function renderUserAuditLog(rows) {
+    const box = document.getElementById("det-audit-box");
+    if (!box) return;
+
+    if (!rows.length) {
+        box.innerHTML = `<div class="admin-detail-empty">No audit events recorded for this customer.</div>`;
+        return;
+    }
+
+    box.innerHTML = rows.map(event => `
+        <div class="admin-event-row">
+            <span>
+                <strong>${escapeHtml(event.action || "Audit event")}</strong>
+                <small>${escapeHtml(event.resource || "resource")} · ${escapeHtml(formatDateTime(event.created_at))} · ${escapeHtml(event.ip_address || "No IP")}</small>
+            </span>
+            <span class="admin-status-badge active">Logged</span>
+        </div>
+    `).join("");
 }
 
 function setModalActionsDisabled(disabled) {
@@ -704,6 +1143,193 @@ function toggleFreezeFromModal() {
         })
         .catch(error => adminNotify(error.message || "Connection failed.", "error"))
         .finally(() => setButtonLoading(freezeButton, false));
+}
+
+function initAdminTransactionsPage() {
+    const tbody = document.getElementById("admin-txns-tbody");
+    if (!tbody) return;
+
+    const searchInput = document.getElementById("admin-txn-search");
+    const statusFilter = document.getElementById("admin-txn-status-filter");
+    const typeFilter = document.getElementById("admin-txn-type-filter");
+    const categoryFilter = document.getElementById("admin-txn-category-filter");
+    const refreshButton = document.getElementById("admin-txns-refresh");
+    const render = () => renderTxnsTable(filterAdminTransactions());
+
+    searchInput?.addEventListener("input", render);
+    statusFilter?.addEventListener("change", render);
+    typeFilter?.addEventListener("change", render);
+    categoryFilter?.addEventListener("change", render);
+    refreshButton?.addEventListener("click", () => loadTransactions(true));
+
+    document.querySelectorAll("[data-txn-preset]").forEach(card => {
+        card.addEventListener("click", () => {
+            const preset = card.dataset.txnPreset;
+            if (searchInput) searchInput.value = "";
+            if (typeFilter) typeFilter.value = "all";
+            if (categoryFilter) categoryFilter.value = "all";
+            if (statusFilter) statusFilter.value = ["completed", "reversed"].includes(preset) ? preset : "all";
+            document.querySelectorAll("[data-txn-preset]").forEach(item => item.classList.remove("active"));
+            card.classList.add("active");
+            render();
+        });
+    });
+
+    loadTransactions();
+}
+
+async function loadTransactions(manual = false) {
+    const tbody = document.getElementById("admin-txns-tbody");
+    const refreshButton = document.getElementById("admin-txns-refresh");
+    if (tbody && !adminTransactionsList.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="admin-empty-cell">Loading transaction logs...</td></tr>`;
+    }
+
+    setButtonLoading(refreshButton, manual, "Refreshing...");
+    try {
+        const response = await requestJson("/api/admin/transactions?limit=300");
+        adminTransactionsList = response.data || [];
+        renderTransactionsSummary(adminTransactionsList);
+        renderTxnsTable(filterAdminTransactions());
+        if (manual) adminNotify("Transaction ledger refreshed.", "accent");
+    } catch (error) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="admin-empty-cell">${escapeHtml(error.message)}</td></tr>`;
+    } finally {
+        setButtonLoading(refreshButton, false);
+    }
+}
+
+function renderTransactionsSummary(rows) {
+    const completed = rows.filter(txn => normalise(txn.status) === "completed").length;
+    const reversed = rows.filter(txn => normalise(txn.status) === "reversed" || normalise(txn.transaction_type) === "reversal").length;
+
+    setText("txns-total-count", rows.length);
+    setText("txns-completed-count", completed);
+    setText("txns-reversed-count", reversed);
+}
+
+function filterAdminTransactions() {
+    const query = normalise(document.getElementById("admin-txn-search")?.value);
+    const status = normalise(document.getElementById("admin-txn-status-filter")?.value, "all");
+    const type = normalise(document.getElementById("admin-txn-type-filter")?.value, "all");
+    const category = normalise(document.getElementById("admin-txn-category-filter")?.value, "all");
+
+    return adminTransactionsList.filter(txn => {
+        const haystack = [
+            txn.id,
+            txn.transaction_ref,
+            txn.description,
+            txn.reference,
+            txn.from_account_number,
+            txn.to_account_number,
+            txn.from_user_full_name,
+            txn.to_user_full_name,
+            txn.from_user_email,
+            txn.to_user_email
+        ].join(" ").toLowerCase();
+
+        const queryMatch = !query || haystack.includes(query);
+        const statusMatch = status === "all" || normalise(txn.status) === status;
+        const typeMatch = type === "all" || normalise(txn.transaction_type) === type;
+        const categoryMatch = category === "all" || normalise(txn.category, "other") === category;
+        return queryMatch && statusMatch && typeMatch && categoryMatch;
+    });
+}
+
+function transactionFlowLabel(txn) {
+    const fromUser = txn.from_user_full_name || (txn.from_account_number ? "NovaPay account" : "External");
+    const toUser = txn.to_user_full_name || (txn.to_account_number ? "NovaPay account" : "External");
+    return `${fromUser} -> ${toUser}`;
+}
+
+function transactionPrimaryUserId(txn) {
+    return txn.from_user_id || txn.to_user_id || "";
+}
+
+function renderTxnsTable(txns) {
+    const tbody = document.getElementById("admin-txns-tbody");
+    const resultCount = document.getElementById("admin-txn-result-count");
+    const volume = txns.reduce((sum, txn) => sum + Number(txn.display_amount ?? txn.amount ?? 0), 0);
+    if (!tbody) return;
+
+    if (resultCount) {
+        resultCount.textContent = `${txns.length} of ${adminTransactionsList.length} ledger events shown`;
+    }
+    setText("txns-visible-volume", formatCurrency(volume));
+    setText("admin-txn-ledger-chip", `${formatNumber(txns.length)} visible`);
+
+    if (txns.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="admin-empty-cell">No ledger movements match the current filters.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = txns.map(txn => {
+        const status = normalise(txn.status, "unknown");
+        const type = normalise(txn.transaction_type, "transaction");
+        const isReversable = status === "completed" && type !== "reversal";
+        const userId = transactionPrimaryUserId(txn);
+        const statusClass = status === "completed" ? "active" : status === "reversed" ? "locked" : status === "failed" ? "declined" : "pending";
+
+        return `
+            <tr>
+                <td>
+                    <strong>${escapeHtml(formatDate(txn.created_at))}</strong>
+                    <small class="admin-table-subtext">${escapeHtml(formatTime(txn.created_at))}</small>
+                </td>
+                <td><span class="mono-code">${escapeHtml(txn.transaction_ref || "No ref")}</span></td>
+                <td>
+                    <strong>${escapeHtml(transactionFlowLabel(txn))}</strong>
+                    <small class="admin-table-subtext">
+                        ${escapeHtml(txn.from_account_number || "External")} -> ${escapeHtml(txn.to_account_number || "External")}
+                    </small>
+                </td>
+                <td>
+                    <strong>${escapeHtml(txn.description || "No description")}</strong>
+                    <small class="admin-table-subtext">${escapeHtml(txn.reference || type)}</small>
+                </td>
+                <td><span class="admin-status-badge">${escapeHtml(txn.category || "other")}</span></td>
+                <td><strong class="mono-code">${escapeHtml(formatCurrency(txn.display_amount ?? txn.amount))}</strong></td>
+                <td><span class="admin-status-badge ${statusClass}">${escapeHtml(status)}</span></td>
+                <td class="admin-table-actions">
+                    <div class="admin-row-actions">
+                        ${userId ? `<button type="button" class="btn btn-secondary" data-view-user="${escapeHtml(userId)}">User</button>` : ""}
+                        ${isReversable ? `<button type="button" class="btn btn-secondary admin-danger-outline" data-reverse-txn="${escapeHtml(txn.id)}">Reverse</button>` : '<span class="admin-table-subtext">N/A</span>'}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+    tbody.querySelectorAll("[data-view-user]").forEach(button => {
+        button.addEventListener("click", () => viewUserDetail(button.dataset.viewUser));
+    });
+    tbody.querySelectorAll("[data-reverse-txn]").forEach(button => {
+        button.addEventListener("click", () => reverseTransaction(button.dataset.reverseTxn));
+    });
+}
+
+function reverseTransaction(id) {
+    const txn = adminTransactionsList.find(item => String(item.id) === String(id));
+    const ref = txn?.transaction_ref || "this transaction";
+    if (!window.confirm(`Reverse ${ref}? A counter transaction will be generated instantly.`)) return;
+
+    fetch(`/api/admin/transactions/${encodeURIComponent(id)}/reverse`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken()
+        }
+    })
+        .then(response => response.json())
+        .then(response => {
+            if (response.success) {
+                adminNotify(`Transaction reversed. Reversal ref: ${response.data.reversal_ref}`, "accent");
+                loadTransactions();
+            } else {
+                throw new Error(response?.error?.message || "Reversal failed.");
+            }
+        })
+        .catch(error => adminNotify(error.message || "Connection failed.", "error"));
 }
 
 function initAdminMonitoringPage() {
@@ -900,3 +1526,5 @@ window.closeUserDetailModal = closeUserDetailModal;
 window.viewUserDetail = viewUserDetail;
 window.verifyKYCFromModal = verifyKYCFromModal;
 window.toggleFreezeFromModal = toggleFreezeFromModal;
+window.loadTransactions = loadTransactions;
+window.reverseTransaction = reverseTransaction;

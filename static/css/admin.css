@@ -787,7 +787,7 @@
 
 .admin-audit-modal,
 .admin-failover-modal {
-  width: min(980px, calc(100vw - 48px));
+  width: min(1180px, calc(100vw - 48px));
   max-height: calc(100dvh - 48px);
   display: flex;
   flex-direction: column;
@@ -994,9 +994,190 @@
 }
 
 .admin-account-row {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, auto) auto auto;
   min-height: 58px;
   background: var(--card-hover);
+}
+
+.admin-account-metrics {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-account-metrics span {
+  color: var(--admin-ink);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.admin-audit-stat-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-audit-stat-grid div,
+.admin-signal-grid div,
+.admin-breakdown-row {
+  min-width: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius-md);
+  background: #FFFFFF;
+}
+
+.admin-audit-stat-grid div,
+.admin-signal-grid div {
+  padding: 14px 16px;
+}
+
+.admin-audit-stat-grid span,
+.admin-signal-grid span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-audit-stat-grid strong,
+.admin-signal-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--admin-ink);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.admin-audit-stat-grid small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.admin-modal-tabs {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.admin-modal-tab {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+
+.admin-modal-tab:hover,
+.admin-modal-tab:focus-visible,
+.admin-modal-tab.active {
+  border-color: rgba(153, 27, 27, 0.24);
+  background: #FFFFFF;
+  color: var(--primary);
+  outline: none;
+}
+
+.admin-tab-panel {
+  grid-column: 1 / -1;
+  display: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-tab-panel.active {
+  display: grid;
+}
+
+.admin-signal-grid,
+.admin-breakdown-list {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.admin-breakdown-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 14px;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.admin-breakdown-row.compact {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-breakdown-row strong {
+  color: var(--admin-ink);
+  font-size: 14px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.admin-breakdown-row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.admin-breakdown-row > .admin-meter {
+  grid-column: 1 / -1;
+}
+
+.admin-mini-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-mini-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.admin-mini-table th,
+.admin-mini-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-mini-table th {
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-mini-table td {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.admin-ledger-filter-panel {
+  grid-template-columns: minmax(300px, 1fr) minmax(140px, 170px) minmax(140px, 170px) minmax(150px, 190px) auto;
 }
 
 .admin-account-row .amount {
@@ -1254,7 +1435,8 @@
 
 @media (max-width: 1180px) {
   .admin-kpi-grid,
-  .admin-user-summary-grid {
+  .admin-user-summary-grid,
+  .admin-audit-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1279,7 +1461,8 @@
 
   .admin-filter-panel,
   .admin-audit-modal-body,
-  .admin-audit-summary {
+  .admin-audit-summary,
+  .admin-tab-panel {
     grid-template-columns: 1fr;
   }
 
@@ -1359,11 +1542,17 @@
     grid-template-columns: 1fr;
   }
 
+  .admin-audit-stat-grid,
+  .admin-signal-grid {
+    grid-template-columns: 1fr;
+  }
+
   .admin-detail-list div:nth-child(odd) {
     border-right: 0;
   }
 
   .admin-account-row,
+  .admin-breakdown-row,
   .admin-triage-row,
   .admin-event-row,
   .admin-action-row,
@@ -1382,6 +1571,8 @@
   .admin-event-row,
   .admin-readiness-item,
   .admin-account-row,
+  .admin-breakdown-row,
+  .admin-modal-tab,
   .admin-audit-modal,
   .admin-failover-modal,
   .log-stream-entry,

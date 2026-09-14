@@ -67,6 +67,7 @@ function initCommandPalette() {
     const cmdInput = document.getElementById("cmd-search-input");
     const resultsContainer = document.getElementById("cmd-results");
     const cmdTrigger = document.getElementById("cmd-trigger");
+    const isAdmin = document.body?.dataset?.userRole === "admin";
     
     if (!paletteBackdrop || !cmdInput) return;
     
@@ -114,17 +115,53 @@ function initCommandPalette() {
             return;
         }
         
-        // Navigation options
-        const navItems = [
+        const adminNavItems = [
+            { title: "Go to Admin Dashboard", url: "/admin/dashboard", cat: "navigation" },
+            { title: "Open Customer Accounts", url: "/admin/accounts", cat: "navigation" },
+            { title: "Open User Directory", url: "/admin/users", cat: "navigation" },
+            { title: "Open Transaction Ledger", url: "/admin/transactions", cat: "navigation" },
+            { title: "Open System Monitoring", url: "/admin/monitoring", cat: "navigation" },
+            { title: "System Settings", url: "/settings", cat: "navigation" },
+            { title: "Logout", url: "/logout", cat: "system" }
+        ];
+
+        const customerNavItems = [
             { title: "Go to Dashboard", url: "/dashboard", cat: "navigation" },
             { title: "Go to Transfer Funds", url: "/transactions/transfer", cat: "navigation" },
+            { title: "Manage Beneficiaries", url: "/beneficiaries", cat: "navigation" },
             { title: "View Card Limits", url: "/cards", cat: "navigation" },
+            { title: "Standing Orders", url: "/standing-orders", cat: "navigation" },
+            { title: "Statements", url: "/statements", cat: "navigation" },
             { title: "Open Support Tickets", url: "/support", cat: "navigation" },
             { title: "System Settings", url: "/settings", cat: "navigation" },
             { title: "Logout", url: "/logout", cat: "system" }
         ];
+
+        const navItems = isAdmin ? adminNavItems : customerNavItems;
         
         const filteredNav = navItems.filter(i => i.title.toLowerCase().includes(query));
+
+        if (isAdmin) {
+            fetch(`/api/admin/transactions?search=${encodeURIComponent(query)}&limit=8`)
+                .then(r => r.json())
+                .then(res => {
+                    const matches = [...filteredNav];
+                    if (res.success && res.data) {
+                        res.data.forEach(t => {
+                            matches.push({
+                                title: `${t.transaction_ref || "Ledger event"} - £${Math.abs(Number(t.display_amount || t.amount || 0)).toFixed(2)} (${t.status || "status"})`,
+                                url: "/admin/transactions",
+                                cat: "ledger"
+                            });
+                        });
+                    }
+                    renderResults(matches, query);
+                })
+                .catch(() => {
+                    renderResults(filteredNav, query);
+                });
+            return;
+        }
         
         // Query matching transactions
         fetch(`/api/transactions?search=${encodeURIComponent(query)}`)
@@ -207,7 +244,7 @@ function showTimeoutBanner() {
         banner = document.createElement("div");
         banner.id = "timeout-banner";
         banner.style.cssText = "position:fixed; top:70px; left:0; width:100%; padding:10px; background-color:var(--accent-warm); color:var(--primary); font-weight:600; font-size:13px; text-align:center; z-index:999; box-shadow:0 2px 5px rgba(0,0,0,0.1);";
-        banner.innerHTML = `⚠️ Your banking session will expire in 5 minutes due to inactivity. Move your mouse or type to continue.`;
+        banner.innerHTML = `Security notice: Your banking session will expire in 5 minutes due to inactivity. Move your mouse or type to continue.`;
         document.body.appendChild(banner);
     }
     banner.style.display = "block";

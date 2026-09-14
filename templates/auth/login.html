@@ -143,7 +143,7 @@ function handleLogin(e) {
             if (res.mfa_required) {
                 window.location.href = "/mfa-verify";
             } else {
-                window.location.href = "{{ url_for('dashboard.index') }}";
+                window.location.href = res.redirect_url || "{{ url_for('dashboard.index') }}";
             }
         } else {
             showToast(res.error.message || "Authentication failed.", "error");

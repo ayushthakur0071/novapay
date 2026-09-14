@@ -402,6 +402,8 @@ def _decorate_single_goal(row):
 def home():
     """Redirects base path to dashboard or login depending on session status."""
     if current_user.is_authenticated:
+        if current_user.is_admin:
+            return redirect(url_for("admin.dashboard"))
         return redirect(url_for("dashboard.index"))
     return redirect(url_for("auth.login"))
 
@@ -410,6 +412,9 @@ def home():
 @login_required
 def index():
     """Serves the main customer dashboard view."""
+    if current_user.is_admin:
+        return redirect(url_for("admin.dashboard"))
+
     try:
         payload = _dashboard_payload()
     except Exception as e:

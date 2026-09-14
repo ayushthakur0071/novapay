@@ -1,0 +1,246 @@
+<div id="user-detail-modal" class="admin-modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="admin-user-modal-title">
+    <section class="admin-audit-modal">
+        <header class="admin-modal-header">
+            <div class="admin-modal-identity">
+                <span class="admin-modal-avatar" id="user-modal-avatar">--</span>
+                <div>
+                    <span class="admin-kicker">Customer Audit Profile</span>
+                    <h3 id="admin-user-modal-title">Customer profile</h3>
+                    <p id="det-user-id">Loading profile...</p>
+                </div>
+            </div>
+            <button type="button" class="admin-modal-close" id="close-user-detail-modal" aria-label="Close customer audit profile">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </header>
+
+        <div class="admin-audit-modal-body">
+            <section class="admin-audit-summary">
+                <div class="admin-audit-balance">
+                    <span>Total account exposure</span>
+                    <strong id="det-total-balance">£0.00</strong>
+                    <small><span id="det-account-count">0</span> linked products · <span id="det-available-balance">£0.00</span> available</small>
+                </div>
+                <div class="admin-audit-status-grid">
+                    <span class="admin-status-badge" id="det-kyc">PENDING</span>
+                    <span class="admin-status-badge" id="det-active">Checking status</span>
+                </div>
+            </section>
+
+            <section class="admin-audit-stat-grid" aria-label="Customer financial summary">
+                <div>
+                    <span>Monthly spend</span>
+                    <strong id="det-monthly-spending">£0.00</strong>
+                    <small id="det-modal-month">Current month</small>
+                </div>
+                <div>
+                    <span>Monthly income</span>
+                    <strong id="det-monthly-income">£0.00</strong>
+                    <small>External credits</small>
+                </div>
+                <div>
+                    <span>Ledger events</span>
+                    <strong id="det-ledger-count">0</strong>
+                    <small>All linked accounts</small>
+                </div>
+                <div>
+                    <span>Overdraft exposure</span>
+                    <strong id="det-overdraft">£0.00</strong>
+                    <small>Approved facility</small>
+                </div>
+            </section>
+
+            <nav class="admin-modal-tabs" role="tablist" aria-label="Customer audit sections">
+                <button type="button" class="admin-modal-tab active" data-user-modal-tab="overview" role="tab" aria-selected="true">Overview</button>
+                <button type="button" class="admin-modal-tab" data-user-modal-tab="accounts" role="tab" aria-selected="false">Accounts</button>
+                <button type="button" class="admin-modal-tab" data-user-modal-tab="ledger" role="tab" aria-selected="false">Ledger</button>
+                <button type="button" class="admin-modal-tab" data-user-modal-tab="activity" role="tab" aria-selected="false">Activity</button>
+            </nav>
+
+            <section class="admin-tab-panel active" data-user-panel="overview">
+                <section class="admin-audit-card">
+                    <header>
+                        <h4>Identity Details</h4>
+                        <span class="admin-live-chip">Profile</span>
+                    </header>
+                    <dl class="admin-detail-list">
+                        <div>
+                            <dt>Full Name</dt>
+                            <dd id="det-fullname">-</dd>
+                        </div>
+                        <div>
+                            <dt>Email</dt>
+                            <dd id="det-email">-</dd>
+                        </div>
+                        <div>
+                            <dt>Phone</dt>
+                            <dd id="det-phone">-</dd>
+                        </div>
+                        <div>
+                            <dt>Address</dt>
+                            <dd id="det-address">-</dd>
+                        </div>
+                        <div>
+                            <dt>Date of Birth</dt>
+                            <dd id="det-dob">-</dd>
+                        </div>
+                        <div>
+                            <dt>Country</dt>
+                            <dd id="det-country">-</dd>
+                        </div>
+                        <div>
+                            <dt>Joined</dt>
+                            <dd id="det-created">-</dd>
+                        </div>
+                        <div>
+                            <dt>Last Login</dt>
+                            <dd id="det-last-login">-</dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="admin-audit-card">
+                    <header>
+                        <h4>Security Checks</h4>
+                        <span class="admin-live-chip">Controls</span>
+                    </header>
+                    <div class="admin-signal-grid">
+                        <div>
+                            <span>KYC verified</span>
+                            <strong id="det-verified">Pending</strong>
+                        </div>
+                        <div>
+                            <span>MFA status</span>
+                            <strong id="det-mfa">Unknown</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="admin-audit-card admin-audit-products">
+                    <header>
+                        <h4>Identity Scan</h4>
+                        <span id="det-doc-type" class="admin-live-chip">No document</span>
+                    </header>
+                    <div id="det-kyc-doc-section" class="admin-doc-preview">
+                        <div class="admin-doc-empty" id="det-doc-empty">No KYC document uploaded for this customer.</div>
+                        <img id="det-doc-img" src="" alt="Uploaded KYC scan preview">
+                    </div>
+                </section>
+            </section>
+
+            <section class="admin-tab-panel" data-user-panel="accounts">
+                <section class="admin-audit-card admin-audit-products">
+                    <header>
+                        <h4>Financial Products Bound</h4>
+                        <span class="admin-live-chip" id="det-product-status">0 accounts</span>
+                    </header>
+                    <div id="det-accounts-box" class="admin-account-stack"></div>
+                </section>
+
+                <section class="admin-audit-card">
+                    <header>
+                        <h4>Spending This Month</h4>
+                        <span class="admin-live-chip">Categories</span>
+                    </header>
+                    <div id="det-spending-box" class="admin-breakdown-list"></div>
+                </section>
+
+                <section class="admin-audit-card">
+                    <header>
+                        <h4>Budgets</h4>
+                        <span class="admin-live-chip">Current month</span>
+                    </header>
+                    <div id="det-budgets-box" class="admin-breakdown-list"></div>
+                </section>
+
+                <section class="admin-audit-card admin-audit-products">
+                    <header>
+                        <h4>Savings Goals</h4>
+                        <span class="admin-live-chip">Progress</span>
+                    </header>
+                    <div id="det-goals-box" class="admin-breakdown-list"></div>
+                </section>
+            </section>
+
+            <section class="admin-tab-panel" data-user-panel="ledger">
+                <section class="admin-audit-card admin-audit-products">
+                    <header>
+                        <h4>Recent Transactions</h4>
+                        <span class="admin-live-chip">Latest 80</span>
+                    </header>
+                    <div class="admin-mini-table-wrap">
+                        <table class="admin-mini-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Reference</th>
+                                    <th>Counterparty</th>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="det-transactions-body">
+                                <tr>
+                                    <td colspan="6">No transactions loaded.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </section>
+
+            <section class="admin-tab-panel" data-user-panel="activity">
+                <section class="admin-audit-card">
+                    <header>
+                        <h4>Cards</h4>
+                        <span class="admin-live-chip">Linked cards</span>
+                    </header>
+                    <div id="det-cards-box" class="admin-breakdown-list"></div>
+                </section>
+
+                <section class="admin-audit-card">
+                    <header>
+                        <h4>Scheduled Payments</h4>
+                        <span class="admin-live-chip">Scheduled</span>
+                    </header>
+                    <div id="det-standing-orders-box" class="admin-breakdown-list"></div>
+                </section>
+
+                <section class="admin-audit-card">
+                    <header>
+                        <h4>Support Tickets</h4>
+                        <span class="admin-live-chip">Recent</span>
+                    </header>
+                    <div id="det-support-box" class="admin-breakdown-list"></div>
+                </section>
+
+                <section class="admin-audit-card">
+                    <header>
+                        <h4>Notifications</h4>
+                        <span class="admin-live-chip">Recent</span>
+                    </header>
+                    <div id="det-notifications-box" class="admin-breakdown-list"></div>
+                </section>
+
+                <section class="admin-audit-card admin-audit-products">
+                    <header>
+                        <h4>Audit Trail</h4>
+                        <span class="admin-live-chip">Security log</span>
+                    </header>
+                    <div id="det-audit-box" class="admin-event-stream compact"></div>
+                </section>
+            </section>
+        </div>
+
+        <footer class="admin-modal-actions">
+            <div class="admin-kyc-controls" id="kyc-controls-group">
+                <button type="button" class="btn btn-accent" data-kyc-status="approved" id="btn-modal-approve">Approve</button>
+                <button type="button" class="btn btn-secondary" data-kyc-status="hold" id="btn-modal-hold">Hold</button>
+                <button type="button" class="btn btn-danger" data-kyc-status="declined" id="btn-modal-decline">Decline</button>
+            </div>
+            <button type="button" class="btn btn-secondary admin-danger-outline" id="btn-modal-freeze">Lock User Profile</button>
+            <button type="button" class="btn btn-secondary" id="btn-modal-close-secondary">Close</button>
+        </footer>
+    </section>
+</div>

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}NovaPay Admin - Customer Accounts{% endblock %}
+
+{% block body_class %}admin-body{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="admin-page admin-accounts-page stagger" data-admin-page="accounts">
+    <section class="admin-page-header">
+        <div>
+            <span class="admin-kicker">Account Operations</span>
+            <h2>Customer Accounts</h2>
+            <p>Inspect every customer account, balance, transaction footprint, status, and owner profile without entering the customer dashboard.</p>
+        </div>
+        <div class="admin-header-actions">
+            <button type="button" class="btn btn-secondary admin-icon-button" id="admin-accounts-refresh">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.7 6.3A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h8V3z"/></svg>
+                Refresh
+            </button>
+            <a href="{{ url_for('admin.users_list') }}" class="btn btn-primary admin-icon-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-3.2-6.4A5 5 0 1 0 8 13c-3.31 0-6 1.79-6 4v2h12v-2c0-1.03-.58-1.97-1.54-2.67A7.95 7.95 0 0 1 16 13c-1.2 0-2.33-.27-3.33-.75A4 4 0 0 0 16 11zm0 2c-2.67 0-5 1.34-5 3v3h10v-3c0-1.66-2.33-3-5-3z"/></svg>
+                User Directory
+            </a>
+        </div>
+    </section>
+
+    <section class="admin-user-summary-grid" aria-label="Account management summary">
+        <button type="button" class="admin-summary-card active" data-account-preset="all">
+            <span>Total Accounts</span>
+            <strong id="accounts-total-count">0</strong>
+            <small>All customer products</small>
+        </button>
+        <button type="button" class="admin-summary-card" data-account-preset="live">
+            <span>Live Accounts</span>
+            <strong id="accounts-live-count">0</strong>
+            <small>Open and unfrozen</small>
+        </button>
+        <button type="button" class="admin-summary-card" data-account-preset="restricted">
+            <span>Restricted</span>
+            <strong id="accounts-restricted-count">0</strong>
+            <small>Frozen or inactive</small>
+        </button>
+        <button type="button" class="admin-summary-card" data-account-preset="overdrawn">
+            <span>Overdrawn</span>
+            <strong id="accounts-overdrawn-count">0</strong>
+            <small>Negative balance</small>
+        </button>
+    </section>
+
+    <section class="admin-filter-panel admin-account-filter-panel" aria-label="Account filters">
+        <label class="admin-search-field" for="admin-account-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16a6.471 6.471 0 0 0 4.23-1.57l.27.28v.79l5 4.99L20.49 19zM9.5 14A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+            <input id="admin-account-search" type="search" placeholder="Search owner, email, account number, sort code, or account ID" autocomplete="off">
+        </label>
+
+        <label class="admin-filter-control" for="admin-account-type-filter">
+            <span>Type</span>
+            <select id="admin-account-type-filter">
+                <option value="all">All types</option>
+                <option value="current">Current</option>
+                <option value="savings">Savings</option>
+                <option value="business">Business</option>
+            </select>
+        </label>
+
+        <label class="admin-filter-control" for="admin-account-status-filter">
+            <span>Status</span>
+            <select id="admin-account-status-filter">
+                <option value="all">All statuses</option>
+                <option value="live">Live</option>
+                <option value="restricted">Restricted</option>
+                <option value="frozen">Frozen</option>
+                <option value="inactive">Inactive</option>
+                <option value="overdrawn">Overdrawn</option>
+            </select>
+        </label>
+
+        <p class="admin-filter-result" id="admin-account-result-count">Loading accounts...</p>
+    </section>
+
+    <section class="admin-table-panel">
+        <header class="admin-panel-header">
+            <div>
+                <span class="admin-kicker">Products</span>
+                <h3>Account Audit Table</h3>
+            </div>
+            <span class="admin-live-chip" id="admin-account-balance-chip">£0.00 total</span>
+        </header>
+
+        <div class="admin-table-container">
+            <table class="admin-table" id="admin-accounts-table">
+                <thead>
+                    <tr>
+                        <th>Owner</th>
+                        <th>Account</th>
+                        <th>Type</th>
+                        <th>Balance</th>
+                        <th>Available</th>
+                        <th>Transactions</th>
+                        <th>Status</th>
+                        <th class="admin-table-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-accounts-tbody">
+                    <tr>
+                        <td colspan="8" class="admin-empty-cell">Fetching account directory...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block modals %}
+{% include "admin/_user_detail_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

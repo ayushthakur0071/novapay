@@ -1,4 +1,4 @@
-const CACHE_NAME = 'novapay-v1';
+const CACHE_NAME = 'novapay-v2';
 const ASSETS = [
   '/',
   '/static/css/main.css',
@@ -6,6 +6,7 @@ const ASSETS = [
   '/static/css/auth.css',
   '/static/css/admin.css',
   '/static/js/main.js',
+  '/static/js/admin.js',
   '/static/js/animations.js',
   '/static/js/monitoring.js',
   '/static/assets/logo.svg',

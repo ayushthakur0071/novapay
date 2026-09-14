@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% block body_class %}{% endblock %}" {% if current_user.is_authenticated %}data-user-role="{{ 'admin' if current_user.is_admin else 'customer' }}"{% endif %}>
 
     <div class="app-container">
         <!-- Sidebar Navigation -->
@@ -37,6 +37,44 @@
                 </div>
             </div>
             
+                {% if current_user.is_admin %}
+            <nav class="nav-menu">
+                <li class="nav-item {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+                    <a href="{{ url_for('admin.dashboard') }}" class="nav-link">
+                        Admin Dashboard
+                    </a>
+                </li>
+                <li class="nav-item {% if request.endpoint == 'admin.accounts_list' %}active{% endif %}">
+                    <a href="{{ url_for('admin.accounts_list') }}" class="nav-link">
+                        Customer Accounts
+                    </a>
+                </li>
+                <li class="nav-item {% if request.endpoint == 'admin.users_list' %}active{% endif %}">
+                    <a href="{{ url_for('admin.users_list') }}" class="nav-link">
+                        Users
+                    </a>
+                </li>
+                <li class="nav-item {% if request.endpoint == 'admin.txns_list' %}active{% endif %}">
+                    <a href="{{ url_for('admin.txns_list') }}" class="nav-link">
+                        Transaction Ledger
+                    </a>
+                </li>
+                <li class="nav-item {% if request.endpoint == 'admin.monitoring_dashboard' %}active{% endif %}">
+                    <a href="{{ url_for('admin.monitoring_dashboard') }}" class="nav-link">
+                        Monitoring
+                    </a>
+                </li>
+                <li class="nav-item {% if request.blueprint == 'profile' and request.path == '/profile' %}active{% endif %}">
+                    <a href="{{ url_for('profile.index') }}" class="nav-link">
+                        Admin Profile
+                    </a>
+                </li>
+                <li class="nav-item {% if request.path == '/settings' %}active{% endif %}">
+                    <a href="{{ url_for('profile.settings') }}" class="nav-link">
+                        Settings
+                    </a>
+                </li>
+                {% else %}
             <nav class="nav-menu">
                 <li class="nav-item {% if request.blueprint == 'dashboard' %}active{% endif %}">
                     <a href="{{ url_for('dashboard.index') }}" class="nav-link">
@@ -93,15 +131,8 @@
                         Settings
                     </a>
                 </li>
-                
-                {% if current_user.is_admin %}
-                <li class="nav-item" style="margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
-                    <a href="{{ url_for('admin.dashboard') }}" class="nav-link" style="color:var(--danger);">
-                        Admin Panel
-                    </a>
-                </li>
                 {% endif %}
-                
+
                 <li class="nav-item" style="margin-top:auto;">
                     <a href="{{ url_for('auth.logout') }}" class="nav-link">
                         Sign Out
@@ -121,6 +152,7 @@
         <!-- Main Workspace -->
         <main class="main-wrapper {% if not current_user.is_authenticated %}full-width{% endif %}">
             {% if current_user.is_authenticated %}
+            {% set back_fallback = url_for('admin.dashboard') if current_user.is_admin else url_for('dashboard.index') %}
             <header class="top-navbar">
                 <div class="top-nav-left">
                     <!-- Mobile hamburger -->
@@ -130,7 +162,7 @@
                         </svg>
                     </button>
 
-                    <button type="button" class="app-back-button" data-back-button data-fallback-url="{{ url_for('dashboard.index') }}" aria-label="Go back to previous page">
+                    <button type="button" class="app-back-button" data-back-button data-fallback-url="{{ back_fallback }}" aria-label="Go back to previous page">
                         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                             <path d="M15 18l-6-6 6-6" />
                         </svg>
@@ -140,7 +172,7 @@
                     <!-- Search palette trigger -->
                     <div id="cmd-trigger" class="search-trigger">
                         <svg viewBox="0 0 24 24" width="18" height="18"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                        <span>Search transactions, help...</span>
+                        <span>{% if current_user.is_admin %}Search users, accounts, ledger...{% else %}Search transactions, help...{% endif %}</span>
                         <kbd>Ctrl+K</kbd>
                     </div>
                 </div>
@@ -154,10 +186,15 @@
                         </button>
                     </div>
                     
-                    <!-- Quick send payment CTA -->
+                    {% if current_user.is_admin %}
+                    <a href="{{ url_for('admin.accounts_list') }}" class="btn btn-primary">
+                        Customer Accounts
+                    </a>
+                    {% else %}
                     <a href="{{ url_for('transactions.transfer') }}" class="btn btn-accent">
                         Quick Send
                     </a>
+                    {% endif %}
                 </div>
             </header>
             {% endif %}
@@ -179,6 +216,23 @@
             {% if current_user.is_authenticated %}
             <!-- Mobile Bottom Tab Bar -->
             <div class="mobile-navbar">
+                {% if current_user.is_admin %}
+                <a href="{{ url_for('admin.dashboard') }}" class="mobile-tab {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+                    <span>Admin</span>
+                </a>
+                <a href="{{ url_for('admin.accounts_list') }}" class="mobile-tab {% if request.endpoint == 'admin.accounts_list' %}active{% endif %}">
+                    <span>Accounts</span>
+                </a>
+                <a href="{{ url_for('admin.users_list') }}" class="mobile-tab {% if request.endpoint == 'admin.users_list' %}active{% endif %}">
+                    <span>Users</span>
+                </a>
+                <a href="{{ url_for('admin.txns_list') }}" class="mobile-tab {% if request.endpoint == 'admin.txns_list' %}active{% endif %}">
+                    <span>Ledger</span>
+                </a>
+                <a href="{{ url_for('admin.monitoring_dashboard') }}" class="mobile-tab {% if request.endpoint == 'admin.monitoring_dashboard' %}active{% endif %}">
+                    <span>Monitor</span>
+                </a>
+                {% else %}
                 <a href="/dashboard" class="mobile-tab {% if request.blueprint == 'dashboard' %}active{% endif %}">
                     <span>Home</span>
                 </a>
@@ -194,6 +248,7 @@
                 <a href="/notifications" class="mobile-tab">
                     <span>Alerts</span>
                 </a>
+                {% endif %}
             </div>
             {% endif %}
         </main>
@@ -204,7 +259,7 @@
         <div class="cmd-palette">
             <div class="cmd-input-container">
                 <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                <input id="cmd-search-input" class="cmd-input" type="text" placeholder="Search accounts, beneficiaries, routes..." autocomplete="off">
+                <input id="cmd-search-input" class="cmd-input" type="text" placeholder="{% if current_user.is_authenticated and current_user.is_admin %}Search users, accounts, ledger, routes...{% else %}Search accounts, beneficiaries, routes...{% endif %}" autocomplete="off">
             </div>
             <div id="cmd-results" class="cmd-results"></div>
         </div>
